@@ -1,2 +1,4 @@
-# Master Thesis (DaimlerTruck): eRange-PINN
-William Siegle, 2024
+# eRange-PINN
+### Master Thesis (Daimler Truck)
+### William Siegle, 2024, Stuttgart
+
