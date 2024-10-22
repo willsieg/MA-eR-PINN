@@ -3,9 +3,11 @@ import numpy as np
 import pyarrow.parquet as pq
 import pickle
 from datetime import datetime
+from pathlib import Path
 from scipy.signal import savgol_filter
-from Physics_Model.VehModel import CreateVehicle
+#from Physics_Model.VehModel import CreateVehicle
 
+'''
 ################################################################################################
 # Specify Data Locations:
 parquet_folder = '/home/sieglew/data/processed'                 # Volts Database
@@ -16,6 +18,27 @@ pickle_destination_folder = '/home/sieglew/data/TripFiles'      # Trip pickles f
 
 y_true_folder = '/home/sieglew/data/y_true'                     # Energy Consumption Time Series Data
 ################################################################################################
+'''
+print(Path('.').resolve())
+#  GET LOCATIONS OF REPOSITORY / DATASTORAGE IN CURRENT SYSTEM ENVIRONMENT ------------------------------------------
+global ROOT, DATA_PATH
+if IS_NOTEBOOK:
+    ROOT = Path('..', '..').resolve()
+else:
+    ROOT = Path('.').resolve()
+sys.path.append(os.path.abspath(ROOT))
+
+from data import get_data_path  # paths set in "data/__init__.py"
+DATA_PATH = get_data_path()
+print(f"{'-'*60}\nData located at: \t {DATA_PATH}")
+print(f"Repository located at: \t {ROOT}")
+################################################################################################
+# FILE SOURCES ---------------------------------------------------------------
+parquet_folder = Path(DATA_PATH, "processed") # Trip parquet files
+save_model_folder = Path(ROOT, "src", "models", "pth")
+
+
+
 
 # import database statistics and complete list of files:
 with open(volts_stats, 'rb') as handle:
