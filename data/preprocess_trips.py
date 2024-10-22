@@ -5,7 +5,9 @@ import pickle
 from datetime import datetime
 from pathlib import Path
 from scipy.signal import savgol_filter
-#from Physics_Model.VehModel import CreateVehicle
+
+import sys
+import os
 
 '''
 ################################################################################################
@@ -19,15 +21,13 @@ pickle_destination_folder = '/home/sieglew/data/TripFiles'      # Trip pickles f
 y_true_folder = '/home/sieglew/data/y_true'                     # Energy Consumption Time Series Data
 ################################################################################################
 '''
-print(Path('.').resolve())
+
 #  GET LOCATIONS OF REPOSITORY / DATASTORAGE IN CURRENT SYSTEM ENVIRONMENT ------------------------------------------
 global ROOT, DATA_PATH
-if IS_NOTEBOOK:
-    ROOT = Path('..', '..').resolve()
-else:
-    ROOT = Path('.').resolve()
+ROOT = Path('.').resolve()
 sys.path.append(os.path.abspath(ROOT))
 
+from src.physics_model.VehModel import CreateVehicle
 from data import get_data_path  # paths set in "data/__init__.py"
 DATA_PATH = get_data_path()
 print(f"{'-'*60}\nData located at: \t {DATA_PATH}")
@@ -37,26 +37,33 @@ print(f"Repository located at: \t {ROOT}")
 parquet_folder = Path(DATA_PATH, "processed") # Trip parquet files
 save_model_folder = Path(ROOT, "src", "models", "pth")
 
+# OUTPUT LOCATIONS
+new_parquet_folder = Path(DATA_PATH, "processed_new") # Trip parquet files
+pickle_destination_folder = Path(DATA_PATH, "TripFiles") # Trip parquet files
 
 
-
+'''
 # import database statistics and complete list of files:
 with open(volts_stats, 'rb') as handle:
-    all_files, all_trips_soc, trips_sizes, trip_by_vehicle = pickle.load(handle) 
+    all_files, all_trips_soc, trips_sizes, trip_by_vehicle = pickle.load(handle)
+'''
 
+
+all_files = [Path(parquet_folder, f) for f in os.listdir(parquet_folder) if f.endswith(".parquet")]
 
 # loop through every file:
 for f in all_files:
-    print(f"Reading File: {f}")
+    file = os.path.basename(f)
+    print(f"Reading File: {file}")
 
-    vehicle_id = f[8:10].strip("_t")
-    file_code = f[7:-8]
+    vehicle_id = file[8:10].strip("_t")
+    file_code = file[7:-8]
 
-    df = pd.read_parquet(parquet_folder + "/" + f)
+    df = pd.read_parquet(Path(parquet_folder, file))
     df.sort_index(axis=1, inplace=True)
 
     ############################################################################################
-    pd.DataFrame(df.hv_batmomavldischrgen_cval_1).to_parquet(f'{y_true_folder}/{file_code}.parquet')
+    #pd.DataFrame(df.hv_batmomavldischrgen_cval_1).to_parquet(f'{y_true_folder}/{file_code}.parquet')
 
     signal_only_nans = list(df.columns[np.array(df.isnull().all())])
     signal_with_nans = list(df.columns[np.array(df.isnull().any())])
@@ -76,8 +83,8 @@ for f in all_files:
     # Forward/Backward filling of signal gaps
     ###############################################
     for sig in signal_with_nans:
-    # consider only signals that have less than 25 % NaNs:
-        if df[sig].isnull().mean() < 0.25:
+    # consider only signals that have less than 100 % NaNs:
+        if df[sig].isnull().mean() < 1:
             try:
                 df[sig] = df[sig].ffill().bfill()
             except:
@@ -182,7 +189,7 @@ for f in all_files:
 
     # ORIGINAL TIME SERIES DATA (Preprocessed and reduced)
     ############################################################################################
-    df.drop(columns = signal_only_nans + ['diff','vehicle_id'], inplace=True)
+    #df.drop(columns = signal_only_nans + ['diff','vehicle_id'], inplace=True)
 
     # Save as pickle file in destination folder
     ############################################################################################
