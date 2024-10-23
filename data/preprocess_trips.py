@@ -1,3 +1,5 @@
+import sys
+import os
 import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
@@ -6,60 +8,55 @@ from datetime import datetime
 from pathlib import Path
 from scipy.signal import savgol_filter
 
-import sys
-import os
-
-'''
-################################################################################################
-# Specify Data Locations:
-parquet_folder = '/home/sieglew/data/processed'                 # Volts Database
-new_parquet_folder = '/home/sieglew/data/processed_2'           # same, but with modified time series data
-
-volts_stats = '/home/sieglew/data/Volts.pickle'                 # list of volts Data files (from Parquet_Stats.ipynb)
-pickle_destination_folder = '/home/sieglew/data/TripFiles'      # Trip pickles for Vehicle Model
-
-y_true_folder = '/home/sieglew/data/y_true'                     # Energy Consumption Time Series Data
-################################################################################################
-'''
-
+# ------------------------------------------------------------------------------------------------------------------------------
 #  GET LOCATIONS OF REPOSITORY / DATASTORAGE IN CURRENT SYSTEM ENVIRONMENT ------------------------------------------
 global ROOT, DATA_PATH
 ROOT = Path('.').resolve()
 sys.path.append(os.path.abspath(ROOT))
 
+# relative Imports: ---------------------------------------------------------------------------------------------------
 from src.physics_model.VehModel import CreateVehicle
 from data import get_data_path  # paths set in "data/__init__.py"
+# ------------------------------------------------------------------------------------------------------------------------------
 DATA_PATH = get_data_path()
 print(f"{'-'*60}\nData located at: \t {DATA_PATH}")
 print(f"Repository located at: \t {ROOT}")
-################################################################################################
+
+# ------------------------------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------------------------------
+# Specify Data Locations:
 # FILE SOURCES ---------------------------------------------------------------
 parquet_folder = Path(DATA_PATH, "processed") # Trip parquet files
 save_model_folder = Path(ROOT, "src", "models", "pth")
 
-# OUTPUT LOCATIONS
+# ------------------------------------------------------------------------------------------------------------------------------
+# OUTPUT LOCATIONS ---------------------------------------------------------------
 new_parquet_folder = Path(DATA_PATH, "processed_new") # Trip parquet files
 pickle_destination_folder = Path(DATA_PATH, "TripFiles") # Trip parquet files
 
-
 '''
+# ------------------------------------------------------------------------------------------------------------------------------
+volts_stats = Path(ROOT, "data", "Volts.pickle")
 # import database statistics and complete list of files:
-with open(volts_stats, 'rb') as handle:
-    all_files, all_trips_soc, trips_sizes, trip_by_vehicle = pickle.load(handle)
+try:
+    with open(volts_stats, 'rb') as handle:
+        _, all_trips_soc, trips_sizes, trip_by_vehicle = pickle.load(handle)
+except:
+    pass
 '''
 
-
-all_files = [Path(parquet_folder, f) for f in os.listdir(parquet_folder) if f.endswith(".parquet")]
+# ------------------------------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------------------------------
+all_files = [os.path.basename(Path(parquet_folder, f)) for f in os.listdir(parquet_folder) if f.endswith(".parquet")]
 
 # loop through every file:
 for f in all_files:
-    file = os.path.basename(f)
-    print(f"Reading File: {file}")
+    print(f"Reading File: {f}")
 
-    vehicle_id = file[8:10].strip("_t")
-    file_code = file[7:-8]
+    vehicle_id = f[8:10].strip("_t")
+    file_code = f[7:-8]
 
-    df = pd.read_parquet(Path(parquet_folder, file))
+    df = pd.read_parquet(Path(parquet_folder, f))
     df.sort_index(axis=1, inplace=True)
 
     ############################################################################################
@@ -78,7 +75,7 @@ for f in all_files:
     gps_drop = [i for i in gps_drop if (i>0 and i<len(df))]
 
     if len(gps_drop) > 0:
-        df.loc[gps_drop,['latitude_cval_ippc','longitude_cval_ippc','altitude_cval_ippc']]  = np.NaN
+        df.loc[gps_drop,['latitude_cval_ippc','longitude_cval_ippc','altitude_cval_ippc']]  = np.nan
 
     # Forward/Backward filling of signal gaps
     ###############################################
