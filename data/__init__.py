@@ -7,9 +7,9 @@ def get_data_path():
     Returns the data path based on the operating system.
     """
     if platform.system().lower() == 'windows':
-        data_path = Path('C:/', 'Users', 'SIEGLEW', 'OneDrive - Daimler Truck', 'MA', 'Code', 'DATA')
+        data_path = Path('C:/', 'Users', 'SIEGLEW', 'OneDrive - Daimler Truck', 'MA', 'Code', 'MA-Data')
     elif platform.system().lower() == 'linux':
-        data_path = Path('/home', 'sieglew', 'data')
+        data_path = Path('/home', 'sieglew', 'MA-Data')
     else:
         print("Running on an unsupported platform")
         data_path = None
