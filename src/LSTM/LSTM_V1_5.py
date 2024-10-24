@@ -90,23 +90,18 @@ else:
     DEVICE = ("cpu")
 print(f"   --> Using {DEVICE} device")
 
-# +
-#  GET LOCATIONS OF REPOSITORY / DATASTORAGE IN CURRENT SYSTEM ENVIRONMENT ------------------------------------------
-global ROOT, DATA_PATH
-if IS_NOTEBOOK:
-    ROOT = Path('..', '..').resolve()
-else:
-    ROOT = Path('.').resolve()
-sys.path.append(os.path.abspath(ROOT))
-
-from data import get_data_path  # paths set in "data/__init__.py"
-DATA_PATH = get_data_path()
-print(f"{'-'*60}\nData located at: \t {DATA_PATH}")
-print(f"Repository located at: \t {ROOT}")
-# -
+# ------------ LOCATE REPOSITORY/DATASTORAGE IN CURRENT SYSTEM ENVIRONMENT  --------------
+global ROOT, DATA_PATH, IS_NOTEBOOK                                                     #|
+ROOT = Path('..', '..').resolve() if IS_NOTEBOOK else Path('.').resolve()               #|
+sys.path.append(os.path.abspath(ROOT))                                                  #|
+from data import get_data_path  # paths set in "data/__init__.py"                       #|
+DATA_PATH = get_data_path()                                                             #|
+print(f"{'-'*60}\n{DATA_PATH}:\t\t{', '.join([_.name for _ in DATA_PATH.glob('*/')])}") #|
+print(f"{ROOT}:\t{', '.join([_.name for _ in ROOT.glob('*/')])}")   	                #|
+# ----------------------------------------------------------------------------------------
 
 # FILE SOURCES ---------------------------------------------------------------
-parquet_folder = Path(DATA_PATH, "processed") # Trip parquet files
+parquet_folder = Path(DATA_PATH, "processed_resampled") # Trip parquet files
 save_model_folder = Path(ROOT, "src", "models", "pth")
 
 # ___
@@ -127,7 +122,7 @@ target_column = columns[-1]
 all_files = [Path(parquet_folder, f) for f in os.listdir(parquet_folder) if f.endswith(".parquet")]
 
 # select Only first 100 Input-files in total
-files = all_files[1000:2000]
+files = all_files
 
 # ---------------------------------------------------
 # Train & Test Sets
@@ -140,47 +135,6 @@ train_subset, val_subset, test_subset = random_split(files, [0.8, 0.1, 0.1])
 scaler = StandardScaler()   # Standardize features by removing the mean and scaling to unit variance
 target_scaler = MinMaxScaler(feature_range=(0, 1))  #MinMaxScaler(feature_range=(0, 1))  # Transform features by scaling each feature to a given range
 
-# +
-# #%%skip
-df = pd.read_parquet(files[8], columns=columns, engine='fastparquet')
-
-# filling missing values ---------------
-df.fillna(df.median(), inplace=True)  # Basic Median Filling 
-#df.fillna(method='ffill', inplace=True)  # Forward fill
-#df.fillna(method='bfill', inplace=True)  # Backward fill
-
-if max(df['signal_time']).year < 2000:
-    df['signal_time'] = pd.to_datetime(((df['signal_time']).astype('int64')) * (10**3))
-else:   
-    df['signal_time'] = pd.to_datetime(df['signal_time'])
-
-              
-# Resample time series data ------------
-# Ensure the 'signal_time' column is set as the index and is of datetime type
-#df['signal_time'] = pd.to_datetime(df['signal_time'])
-df.set_index('signal_time', inplace=True)
-
-# Resample the data to a lower frequency of 10 seconds and take the mean of each window
-df_resampled = df.resample('5s').mean() # RESAMPLE AT 10 seconds intervals
-
-# Reset the index if you want 'signal_time' to be a column again
-#df_resampled.reset_index(inplace=True)
-df_resampled.fillna(df.median(), inplace=True)
-
-# assigning inputs and targets and reshaping ---------------
-X = df_resampled[input_columns].values
-y = df_resampled[target_column].values.reshape(-1, 1)     # reshape to match the shape of the input
-
-X = scaler.fit_transform(X)
-y = target_scaler.fit_transform(y).squeeze()
-
-# Append to data
-data, targets = [],[]
-data.append(X)
-targets.append(y)
-df_resampled
-
-# -
 
 # DATASET DEFINITION -----------------------------------------------------------------------
 class TripDataset(Dataset):
@@ -195,29 +149,9 @@ class TripDataset(Dataset):
             # DATA PREPROCESSING -----------------------------------------------------------
             df = pd.read_parquet(file, columns=columns, engine='fastparquet')
 
-            # filling missing values ---------------
-            df.fillna(df.median(), inplace=True)  # Basic Median Filling 
-            #df.fillna(method='ffill', inplace=True)  # Forward fill
-            #df.fillna(method='bfill', inplace=True)  # Backward fill
-            
-            # Resample time series data ------------
-            # correct timestamp if necessary:
-            if max(df['signal_time']).year < 2000:
-                df['signal_time'] = pd.to_datetime(((df['signal_time']).astype('int64')) * (10**3))
-            else:   
-                df['signal_time'] = pd.to_datetime(df['signal_time'])
-
-            df.set_index('signal_time', inplace=True)
-            df_resampled = df.resample('10s').mean() # RESAMPLE AT 10 seconds intervals
-
-            # Reset the index if you want 'signal_time' to be a column again
-            #df_resampled.reset_index(inplace=True)
-            # filling missing values ---------------
-            df_resampled.fillna(df.median(), inplace=True)  # Basic Median Filling
-
             # assigning inputs and targets and reshaping ---------------
-            X = df_resampled[input_columns].values
-            y = df_resampled[target_column].values.reshape(-1, 1)     # reshape to match the shape of the input
+            X = df[input_columns].values
+            y = df[target_column].values.reshape(-1, 1)     # reshape to match the shape of the input
             
             # Normalize inputs
             X = self.scaler.fit_transform(X)
@@ -354,7 +288,7 @@ print(f"{'-'*60}\n",model)
 global NUM_EPOCHS
 
 # HYPERPARAMETERS -----------------------
-NUM_EPOCHS = 5
+NUM_EPOCHS = 50
 learning_rate = 1e-3 # 0.001 lr
 
 # OPTIMIZER -----------------------------
@@ -657,13 +591,9 @@ optimizer.load_state_dict(state['optimizer'])
 # +
 # keep best performing model:
 #best_model_state = deepcopy(model.state_dict())
-# -
-
-test_files
-
-random.sample(test_files,1)
 
 # +
+test_files = list(test_loader.dataset.file_list)
 test_dataset = TripDataset(random.sample(test_files,1), scaler, target_scaler)
 test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False)
 

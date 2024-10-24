@@ -1,5 +1,3 @@
-import sys
-import os
 import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
@@ -8,25 +6,25 @@ from datetime import datetime
 from pathlib import Path
 from scipy.signal import savgol_filter
 
-# ------------------------------------------------------------------------------------------------------------------------------
-#  GET LOCATIONS OF REPOSITORY / DATASTORAGE IN CURRENT SYSTEM ENVIRONMENT ------------------------------------------
-global ROOT, DATA_PATH
-ROOT = Path('.').resolve()
-sys.path.append(os.path.abspath(ROOT))
+# ------------ LOCATE REPOSITORY/DATASTORAGE IN CURRENT SYSTEM ENVIRONMENT  --------------
+import sys, os; from pathlib import Path                                                #|
+global ROOT, DATA_PATH, IS_NOTEBOOK; IS_NOTEBOOK = False                                #|
+ROOT = Path('..', '..').resolve() if IS_NOTEBOOK else Path('..').resolve()    
+sys.path.append(os.path.abspath(ROOT))                                                  #|
+from data import get_data_path  # paths set in "data/__init__.py"                       #|
+DATA_PATH = get_data_path()                                                             #|
+print(f"{'-'*60}\n{DATA_PATH}:\t\t{', '.join([_.name for _ in DATA_PATH.glob('*/')])}") #|
+print(f"{ROOT}:\t{', '.join([_.name for _ in ROOT.glob('*/')])}")   	                #|
+# ----------------------------------------------------------------------------------------
 
 # relative Imports: ---------------------------------------------------------------------------------------------------
 from src.physics_model.VehModel import CreateVehicle
-from data import get_data_path  # paths set in "data/__init__.py"
-# ------------------------------------------------------------------------------------------------------------------------------
-DATA_PATH = get_data_path()
-print(f"{'-'*60}\nData located at: \t {DATA_PATH}")
-print(f"Repository located at: \t {ROOT}")
-
-# ------------------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------------------------------------------------------
 # Specify Data Locations:
 # FILE SOURCES ---------------------------------------------------------------
 parquet_folder = Path(DATA_PATH, "processed") # Trip parquet files
+parquet_folder_resampled = Path(DATA_PATH, "processed_resampled") # Trip parquet filesn for resampled time series
 save_model_folder = Path(ROOT, "src", "models", "pth")
 
 # ------------------------------------------------------------------------------------------------------------------------------
@@ -56,7 +54,7 @@ for f in all_files:
     vehicle_id = f[8:10].strip("_t")
     file_code = f[7:-8]
 
-    df = pd.read_parquet(Path(parquet_folder, f))
+    df = pd.read_parquet(Path(parquet_folder, f), engine='fastparquet')
     df.sort_index(axis=1, inplace=True)
 
     ############################################################################################
@@ -102,11 +100,18 @@ for f in all_files:
     time = pd.DataFrame(np.array((df.signal_time - df.signal_time[0]).dt.seconds))    # TIME since trip Start [s] --> corresponding to time series indices
     time_unix = df.signal_time  # UNIX TIME (starting 1970) [s]
 
+    # RESAMPLING: --> separate directory
+    ###############################################
+    df.set_index('signal_time', inplace=True)
+    df_resampled = df.resample('10s').mean() # RESAMPLE AT 10 seconds intervals
+    df_resampled.reset_index(inplace=True)  # Reset the index if you want 'signal_time' to be a column again
+    #df_resampled.fillna(df.median(), inplace=True)  # Basic Median Filling
+
     # VEHICLE MOTION:
     ###############################################
-    dist = ((df.hirestotalvehdist_cval_icuc - df.hirestotalvehdist_cval_icuc[0]) * 1000).round(3)   # MILEAGE since trip Start [m]
+    dist = ((df.hirestotalvehdist_cval_icuc - df.hirestotalvehdist_cval_icuc.iloc[0]) * 1000).round(3)   # MILEAGE since trip Start [m]
     speed = df.vehspd_cval_cpc/3.6                                  # VEHICLE SPEED [m/s]
-    accel = pd.DataFrame(np.diff(speed, prepend = speed[0]))        # LONGITUDINAL VEHICLE ACCELERATION [m/s^2] 
+    accel = pd.DataFrame(np.diff(speed, prepend = speed.iloc[0]))        # LONGITUDINAL VEHICLE ACCELERATION [m/s^2] 
 
     # ROUTE: 
     ###############################################
@@ -190,9 +195,10 @@ for f in all_files:
 
     # Save as pickle file in destination folder
     ############################################################################################
-    with open(f'{pickle_destination_folder}/{file_code}.pickle', 'wb') as handle:
-        pickle.dump([T,C,V.prm], handle, protocol=pickle.HIGHEST_PROTOCOL)
-        print(f'{file_code}.pickle saved')
+    #with open(f'{pickle_destination_folder}/{file_code}.pickle', 'wb') as handle:
+    #    pickle.dump([T,C,V.prm], handle, protocol=pickle.HIGHEST_PROTOCOL)
+    #    print(f'{file_code}.pickle saved')
 
     ############################################################################################
-    df.to_parquet(f'{new_parquet_folder}/{file_code}.parquet')
+    #df.to_parquet(f'{new_parquet_folder}/{file_code}.parquet')
+    #df_resampled.to_parquet(f'{parquet_folder_resampled}/{file_code}.parquet')

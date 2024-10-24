@@ -1,8 +1,8 @@
-def show_trip_gps(input_file, start = None, end = None):
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 
-    import pandas as pd
-    import plotly.express as px
-    import plotly.graph_objects as go
+def show_trip_gps(input_file, start = None, end = None):
     
     if not (start is None):
         y1 = start
@@ -16,8 +16,6 @@ def show_trip_gps(input_file, start = None, end = None):
 
     if isinstance(input_file, str):
         df = pd.read_parquet(input_file)
-    else:
-        df = input_file
     
     df = df.iloc[y1:y2]
 
