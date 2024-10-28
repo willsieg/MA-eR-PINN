@@ -91,35 +91,25 @@ else:
 print(f"   --> Using {DEVICE} device")
 
 # ------------ LOCATE REPOSITORY/DATASTORAGE IN CURRENT SYSTEM ENVIRONMENT  --------------
-global ROOT, DATA_PATH, IS_NOTEBOOK                                                     #|
-ROOT = Path('..', '..').resolve() if IS_NOTEBOOK else Path('.').resolve()               #|
-sys.path.append(os.path.abspath(ROOT))                                                  #|
+global ROOT, DATA_PATH                                                   #|
+ROOT = Path('..', '..').resolve() if IS_NOTEBOOK else Path('..', '..').resolve()               #|
+sys.path.append(os.path.abspath(ROOT))
+print(f"{ROOT}:\t{', '.join([_.name for _ in ROOT.glob('*/')])}")                                                  #|
 from data import get_data_path  # paths set in "data/__init__.py"                       #|
 DATA_PATH = get_data_path()                                                             #|
-print(f"{'-'*60}\n{DATA_PATH}:\t\t{', '.join([_.name for _ in DATA_PATH.glob('*/')])}") #|
-print(f"{ROOT}:\t{', '.join([_.name for _ in ROOT.glob('*/')])}")   	                #|
+print(f"{'-'*60}\n{DATA_PATH}:\t\t{', '.join([_.name for _ in DATA_PATH.glob('*/')])}") #|  	                #|
 # ----------------------------------------------------------------------------------------
 
 # FILE SOURCES ---------------------------------------------------------------
-parquet_folder = Path(DATA_PATH, "processed_resampled") # Trip parquet files
+input_folder = Path(DATA_PATH, "trips_processed_resampled") # Trip parquet files
 save_model_folder = Path(ROOT, "src", "models", "pth")
 
 # ___
 # DATA PREPROCESSING
 
 # +
-# INPUT & TARGET SPECIFICATION ---------------------------------------------------
-columns = ["signal_time", 
-            "hirestotalvehdist_cval_icuc", "vehspd_cval_cpc", "altitude_cval_ippc", "bs_roadincln_cval", "ambtemp_cval_pt", "hv_batpwr_cval_bms1", 
-            "hv_batmomavldischrgen_cval_1"]
-
-# Time and Target column taken out
-input_columns = columns[1:-1]
-target_column = columns[-1]
-
-# +
 # PREPARE TRAIN & TEST SET ---------------------------------------------------
-all_files = [Path(parquet_folder, f) for f in os.listdir(parquet_folder) if f.endswith(".parquet")]
+all_files = [Path(input_folder, f) for f in os.listdir(input_folder) if f.endswith(".parquet")]
 
 # select Only first 100 Input-files in total
 files = all_files
@@ -129,6 +119,24 @@ files = all_files
 # train_subset, test_subset = train_test_split(files, test_size=0.2, random_state=1)
 
 train_subset, val_subset, test_subset = random_split(files, [0.8, 0.1, 0.1])
+# -
+
+df = pd.read_parquet(Path(input_folder, files[0]), engine='fastparquet')
+signals = df.columns
+assert len(signals) == 82
+
+# +
+# INPUT & TARGET SPECIFICATION ---------------------------------------------------
+columns = ["signal_time", 
+            "hirestotalvehdist_cval_icuc", "vehspd_cval_cpc", "altitude_cval_ippc", "bs_roadincln_cval", "ambtemp_cval_pt", "hv_batpwr_cval_bms1", 
+            "hv_batmomavldischrgen_cval_1"]
+
+# Time and Target column taken out
+#input_columns = columns[1:-1]
+#target_column = columns[-1]
+
+input_columns = signals.drop(["hv_batmomavldischrgen_cval_1", "signal_time", "hirestotalvehdist_cval_cpc", "hv_batmomavlchrgen_cval_bms1", "hv_bat_soc_cval_bms1"])
+target_column = "hv_batmomavldischrgen_cval_1"
 # -
 
 # FEATURE NORMALIZATION/SCALING -----------------------------------------------------------------
@@ -147,7 +155,7 @@ class TripDataset(Dataset):
 
         for file in self.file_list:
             # DATA PREPROCESSING -----------------------------------------------------------
-            df = pd.read_parquet(file, columns=columns, engine='fastparquet')
+            df = pd.read_parquet(file, columns=signals, engine='fastparquet')
 
             # assigning inputs and targets and reshaping ---------------
             X = df[input_columns].values
@@ -504,55 +512,6 @@ train_losses, val_losses, epochs_completed, training_table = train_model(
     )
 
 # +
-# get DataFrame of training metrics:
-training_df = pd.DataFrame(training_table, columns=["Epoch", "Iteration", "Batch Loss", "Train Loss"])
-# Extract the 'Train Loss' column and compare with the train_losses list
-train_loss_column = training_df['Train Loss'].replace(['',' '], np.nan).dropna().astype(float).values
-if any(abs(train_loss_column - train_losses) > 1e-3): print("Extracted and original Train Losses are not equal. Please check metrics table.")
-
-# -------------------------------------
-# plot training performance:
-plt.style.use('ggplot')
-fig, ax1 = plt.subplots(figsize=(8,3))
-
-# Set x-axis to integers starting from 1
-ax1.set_xlabel('Epochs')
-ax1.set_xticks(range(1, NUM_EPOCHS + 1))
-
-plt.plot(range(1, NUM_EPOCHS + 1), train_losses, label='train_loss')
-plt.plot(range(1, NUM_EPOCHS + 1), val_losses, label='val_loss')
-plt.yscale('log')
-fig.tight_layout(); plt.legend();
-
-# -
-
-# ___
-# EVALUATION / POST-PROCESSING
-
-# +
-# EVALUATION -----------------------------------------------------------------
-model.eval() # set model to evaluation mode
-test_loss = 0
-
-with torch.no_grad():
-
-    for iter, (inputs, targets) in enumerate(test_loader):
-        inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
-        outputs = model(inputs)
-
-        # Optional: Inverse-transform outputs and targets for evaluation
-        # You can use `scaled_outputs` and `scaled_targets` for error metrics in the original scale if needed
-        scaled_outputs = target_scaler.inverse_transform(outputs.detach().cpu().numpy().reshape(-1, 1))
-        scaled_targets = target_scaler.inverse_transform(targets.detach().cpu().numpy().reshape(-1, 1))
-
-        loss = criterion(outputs.squeeze(), targets)
-        test_loss += loss.item()
-
-test_loss /= len(test_loader)
-print(f"Test Loss:  {test_loss:.4f}")
-print(f"Iterations: {iter}/{math.floor(len(test_loader.dataset) / test_loader.batch_size)}")
-
-# +
 # SAVE MODEL  -----------------------------------------------------------------
 
 # create unique model name
@@ -588,9 +547,57 @@ model.load_state_dict(state['state_dict'])
 optimizer.load_state_dict(state['optimizer'])
 ''';
 
+# OPTIONAL: KEEP BEST PERFORMING MODEL -----------------
+'''
+best_model_state = deepcopy(model.state_dict())''';
+
 # +
-# keep best performing model:
-#best_model_state = deepcopy(model.state_dict())
+# get DataFrame of training metrics:
+training_df = pd.DataFrame(training_table, columns=["Epoch", "Iteration", "Batch Loss", "Train Loss"])
+# Extract the 'Train Loss' column and compare with the train_losses list
+train_loss_column = training_df['Train Loss'].replace(['',' '], np.nan).dropna().astype(float).values
+if any(abs(train_loss_column - train_losses) > 1e-3): print("Extracted and original Train Losses are not equal. Please check metrics table.")
+
+# -------------------------------------
+# plot training performance:
+plt.style.use('ggplot')
+fig, ax1 = plt.subplots(figsize=(8,3))
+
+# Set x-axis to integers starting from 1
+ax1.set_xlabel('Epochs')
+ax1.set_xticks(range(1, NUM_EPOCHS + 1))
+
+plt.plot(range(1, NUM_EPOCHS + 1), train_losses, label='train_loss')
+plt.plot(range(1, NUM_EPOCHS + 1), val_losses, label='val_loss')
+plt.yscale('log')
+fig.tight_layout(); plt.legend();
+# -
+
+# ___
+# EVALUATION / POST-PROCESSING
+
+# +
+# EVALUATION -----------------------------------------------------------------
+model.eval() # set model to evaluation mode
+test_loss = 0
+
+with torch.no_grad():
+
+    for iter, (inputs, targets) in enumerate(test_loader):
+        inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
+        outputs = model(inputs)
+
+        # Optional: Inverse-transform outputs and targets for evaluation
+        # You can use `scaled_outputs` and `scaled_targets` for error metrics in the original scale if needed
+        scaled_outputs = target_scaler.inverse_transform(outputs.detach().cpu().numpy().reshape(-1, 1))
+        scaled_targets = target_scaler.inverse_transform(targets.detach().cpu().numpy().reshape(-1, 1))
+
+        loss = criterion(outputs.squeeze(), targets)
+        test_loss += loss.item()
+
+test_loss /= len(test_loader)
+print(f"Test Loss:  {test_loss:.4f}")
+print(f"Iterations: {iter}/{math.floor(len(test_loader.dataset) / test_loader.batch_size)}")
 
 # +
 test_files = list(test_loader.dataset.file_list)
