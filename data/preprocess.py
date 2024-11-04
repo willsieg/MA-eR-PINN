@@ -23,10 +23,10 @@ from scipy.signal import savgol_filter
 from scipy.stats import zscore, median_abs_deviation
 import pyarrow.parquet as pq 
 
-from IPython.core.magic import register_cell_magic
+'''from IPython.core.magic import register_cell_magic
 @register_cell_magic
 def skip(line, cell):   # cells can be skipped by using '%%skip' in the first line
-    return
+    return'''
 
 
 # -
