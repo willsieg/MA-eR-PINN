@@ -75,6 +75,7 @@ from torch.nn.parameter import Parameter
 from torch.nn.utils.rnn import pack_sequence
 from torch.utils.data import DataLoader, TensorDataset, Dataset, random_split
 from torchmetrics.functional import mean_squared_error
+torch.set_default_dtype(torch.float32)
 torch.manual_seed(1);
 
 # METRICS ---------------------------------------------------------------------
@@ -98,14 +99,14 @@ print('Cuda available: ',torch.cuda.is_available())
 if torch.cuda.is_available():
     DEVICE = torch.device(f"cuda") 
     #DEVICE = torch.device("cuda:1")   # or overwrite with explicit Core number
-    print(f'Currently Selected Device: {torch.cuda.current_device()},  Total Count: {torch.cuda.device_count()}')
+    print(f'Currently Selected Device: {torch.cuda.current_device()}')
 else:
     DEVICE = ("cpu")
 print(f"   --> Using {DEVICE} device")
 
 # ------------ LOCATE REPOSITORY/DATASTORAGE IN CURRENT SYSTEM ENVIRONMENT  --------------
 global ROOT, DATA_PATH
-ROOT = Path('../..').resolve()
+ROOT = Path('../..').resolve() if IS_NOTEBOOK else Path('.').resolve()
 print(f"{'-'*60}\n{ROOT}:\t{', '.join([_.name for _ in ROOT.glob('*/')])}")
 sys.path.append(os.path.abspath(ROOT))
 from data import get_data_path  # paths set in "data/__init__.py"
@@ -114,7 +115,7 @@ print(f"{DATA_PATH}:\t\t{', '.join([_.name for _ in DATA_PATH.glob('*/')])}")
 # ----------------------------------------------------------------------------------------
 
 # FILE SOURCES ---------------------------------------------------------------
-input_folder = Path(DATA_PATH, "final", "trips_processed_resampled") # Trip parquet files
+input_folder = Path(DATA_PATH, "final_2", "trips_processed_resampled") # Trip parquet files
 pth_folder = Path(ROOT, "src", "models", "pth")
 print(f"{'-'*60}\nInput Data: {input_folder}\nStore model in: {pth_folder}")
 
@@ -129,11 +130,11 @@ print(f"{'-'*60}\nTotal Files: {len(files)}\n{'-'*60}")
 # ---------------------------------------------------
 df = pd.read_parquet(Path(input_folder, random.choice(files)), engine='fastparquet')
 all_signals = df.columns
-assert len(all_signals) == 58
+assert len(all_signals) == 57
 
 # get df stats:
-'''df.info()
-from scipy.stats import shapiro
+# df.info()
+'''from scipy.stats import shapiro
 nd = []
 for sig in df.columns:
     if np.ptp(df[sig]) != 0:
@@ -169,33 +170,29 @@ class TripDataset(Dataset):
         self.data = []
         self.targets = []
 
+        print(f"fitting Scalers: {scaler.__class__.__name__}, {target_scaler.__class__.__name__}")
         if self.fit:
-            # Concatenate all data for fitting the scalers
-            all_data = []
-            all_targets = []
+            # Initialize and Fit the scalers on the complete training data set
+            # Fit the scalers incrementally to avoid memory errors
             for file in self.file_list:
-                # DATA PREPROCESSING -----------------------------------------------------------
                 df = pd.read_parquet(file, engine='fastparquet')
                 X = df[input_columns].values
                 y = df[target_column].values.reshape(-1, 1)  # Reshape to match the shape of the input
-                all_data.append(X)
-                all_targets.append(y)
-            all_data = np.vstack(all_data)
-            all_targets = np.vstack(all_targets)
 
-            # Fit the scalers on the combined data
-            self.scaler.fit(all_data)
-            self.target_scaler.fit(all_targets)
+                # Fit the scalers incrementally
+                self.scaler.partial_fit(X)
+                self.target_scaler.partial_fit(y)
+
+            print(f"Done.")
 
         for file in self.file_list:
             # DATA PREPROCESSING -----------------------------------------------------------
-            df = pd.read_parquet(file, engine='fastparquet')
-
             # Assigning inputs and targets and reshaping ---------------
+            df = pd.read_parquet(file, engine='fastparquet')
             X = df[input_columns].values
             y = df[target_column].values.reshape(-1, 1)  # Reshape to match the shape of the input
             
-            # Normalize inputs
+            # use the previously fitted scalers to transform the data
             X = self.scaler.transform(X)    
             y = self.target_scaler.transform(y).squeeze()
             
@@ -208,6 +205,7 @@ class TripDataset(Dataset):
 
     def __getitem__(self, index):
         # Find which file the index belongs to
+        # enables indexing over concatenated dataset via one timestep index
         for i, target in enumerate(self.targets):
             if index < len(target):
                 return (
@@ -219,22 +217,29 @@ class TripDataset(Dataset):
 
 
 # FEATURE NORMALIZATION/SCALING -----------------------------------------------------------------
+# Transform features by scaling each feature to a given range
 scaler = MinMaxScaler(feature_range=(0, 1))    # Standardize features by removing the mean and scaling to unit variance
-target_scaler = MinMaxScaler(feature_range=(0, 1))  #MinMaxScaler(feature_range=(0, 1))  # Transform features by scaling each feature to a given range
+target_scaler = MinMaxScaler(feature_range=(0, 1))  #MinMaxScaler(feature_range=(0, 1))  
 
+# +
 # DATA SET SPLITTING -----------------------------------------------------------------------
 # train_subset, test_subset = train_test_split(files, test_size=0.2, random_state=1)
 train_subset, val_subset, test_subset = random_split(files, [0.8, 0.1, 0.1])
 subsets_split = (train_subset.dataset, val_subset.dataset, test_subset.dataset)
 
+train_files = [os.path.basename(files[i]) for i in train_subset.indices]
+print(train_files[:3])
+
 # +
 # GENERATE DATALOADERS  ---------------------------------------------------------------
 batch_size = 1024 # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
+# Note:
+# the scaler will be fitted only on the training data set
+# shuffling is prohibited to maintain the time series order
 
-# How is the normalization done?
 # TRAIN  ------------------------------------------------------------
 train_dataset = TripDataset(train_subset, scaler, target_scaler, fit=True)
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
 
 # VAL ------------------------------------------------------------
 val_dataset = TripDataset(val_subset, scaler, target_scaler)
@@ -245,9 +250,10 @@ test_dataset = TripDataset(test_subset, scaler, target_scaler)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 # Print the size of the datasets
-print(f"{'-'*60}\nTrain size:  {len(train_dataset)}")
-print(f'Val. size:   {len(val_dataset)}')
-print(f'Test size:   {len(test_dataset)}')
+print(f"{'-'*60}\nTrain size:  {len(train_dataset)}\t\t(Files: {len(train_subset)})")
+print(f'Val. size:   {len(val_dataset)}\t\t(Files: {len(val_subset)})')
+print(f'Test size:   {len(test_dataset)}\t\t(Files: {len(test_subset)})')
+if train_dataset.__len__() != sum(len(data) for data in train_dataset.data): print("Warning: Train Dataset Length Mismatch")
 
 
 # -
@@ -273,12 +279,10 @@ class LSTM1(nn.Module):
             self.num_layers,            # Number of recurrent layers for stacked LSTMs. Default: 1
             batch_first = True,         # If True, then the input and output tensors are provided as (batch, seq, feature) instead of (seq, batch, feature). Default: False
             bias = True,                # If False, then the layer does not use bias weights b_ih and b_hh. Default: True
-            dropout = 0.2,              # usually: [0.2 - 0.5] ,introduces a Dropout layer on the outputs of each LSTM layer except the last layer, (dropout probability). Default: 0
+            dropout = 0.35,              # usually: [0.2 - 0.5] ,introduces a Dropout layer on the outputs of each LSTM layer except the last layer, (dropout probability). Default: 0
             bidirectional = False,      # If True, becomes a bidirectional LSTM. Default: False
             proj_size = 0,              # If > 0, will use LSTM with projections of corresponding size. Default: 0
-            device = DEVICE,
-            dtype = torch.float32
-            ) 
+            device = DEVICE) 
         
         # --------------------------------
         #self.fc_1 =  nn.Linear(hidden_size, 128)  # fully connected 1
@@ -318,13 +322,39 @@ class LSTM1(nn.Module):
 
         return out
 
+
+# +
+# FCNN NETWORK -----------------------------------------------------------------------
+class FCNN(nn.Module):
+    def __init__(self):
+        super(FCNN, self).__init__()
+        
+        # here, our linear layer will have an input of 200, not 100 as before:
+        self.fc1 = nn.Linear(200,5)  
+        self.fc2 = nn.Linear(5,10)   
+        self.fc3 = nn.Linear(10,100) # but the output remains 100
+        
+          
+    def forward(self, x):
+        # we have to flatten our 20x2x100 to a 20x200:
+        x = x.view(x.size(0),-1)     # x.size(0) is 20, and -1 is a shortcut for "figure out the other number for me please!"
+        
+        # the rest proceeds as before:
+        x = F.relu(self.fc1(x))      
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)              
+        return x
+        
+#net = FCNN()
+#print(net) 
+
 # +
 # MODEL CONFIGURATION -----------------------------------------------------------------------
 
 # LAYERS --------------------------------
 input_size = len(input_columns)     # expected features in the input x
-hidden_size = 16                  # features in the hidden state h
-num_layers = 2                      # recurrent layers for stacked LSTMs. Default: 1
+hidden_size = 16                    # features in the hidden state h
+num_layers = 3                      # recurrent layers for stacked LSTMs. Default: 1
 num_classes = 1                     # output classes (=1 for regression)
 
 # INSTANTIATE MODEL --------------------
@@ -339,9 +369,9 @@ print(f"{'-'*60}\n",model)
 # TRAINING CONFIGURATION -----------------------------------------------------------------------
 global NUM_EPOCHS
 
-# HYPERPARAMETERS -----------------------
+# HYPERPARAMETERS ------------------------------------------------------------
 NUM_EPOCHS = 40
-learning_rate = 1e-3 # 0.001 lr
+learning_rate = 1e-2 # 0.001 lr
 
 # OPTIMIZER -----------------------------
 optimizer = torch.optim.AdamW(model.parameters(), lr = learning_rate,
@@ -350,7 +380,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr = learning_rate,
     #eps = 1e-8,             # term added to the denominator to improve numerical stability (default: 1e-8)
 )
 
-# LOSS FUNCTION ---------------------------
+# LOSS FUNCTION ----------------------------------------------------------------
 def loss_fn(model_output, target):
     loss = F.mse_loss(model_output, target) # mean-squared error for regression
     return loss
@@ -359,6 +389,7 @@ def loss_fn(model_output, target):
 criterion = nn.MSELoss()
 #criterion = nn.MSELoss(reduction='mean')
 
+# ------------------------------------------------------------------------------
 # print Model and Optimizer state_dicts
 print(f"{'-'*60}\nModel state_dict:")
 for param_tensor in model.state_dict(): print(f"{param_tensor}:\t {model.state_dict()[param_tensor].size()}")
@@ -567,17 +598,18 @@ if os.path.getsize(model_destination_path) > 100 * 1024**2:
 # -----------------------------------------------------------------
 checkpoint = torch.load(model_destination_path, weights_only=False)
 
-model.eval(); # set model to evaluation mode for inference
 for key in ["model", "loss_fn", "training_table", "train_losses", "val_losses", "epoch"]:
     globals()[key] = checkpoint[key]
+model.eval(); # set model to evaluation mode for inference
 model.load_state_dict(checkpoint['model_state_dict'])
 optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-test_subset = state["subsets_split"][2]
-# -
+test_files = checkpoint["subsets_split"][2]
 
+# +
+# %%skip
 # RESUME TRAINING -----------------------------------------------------------------
 '''resume = True
-if resume: NUM_EPOCHS += 20 # train for 2 more epochs
+if resume: NUM_EPOCHS += 2 # train for 2 more epochs
 
 trained = train_model(
     model = model, 
