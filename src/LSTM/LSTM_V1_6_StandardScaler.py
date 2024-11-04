@@ -219,7 +219,7 @@ class TripDataset(Dataset):
 
 
 # FEATURE NORMALIZATION/SCALING -----------------------------------------------------------------
-scaler = MinMaxScaler(feature_range=(0, 1))    # Standardize features by removing the mean and scaling to unit variance
+scaler = StandardScaler()    # Standardize features by removing the mean and scaling to unit variance
 target_scaler = MinMaxScaler(feature_range=(0, 1))  #MinMaxScaler(feature_range=(0, 1))  # Transform features by scaling each feature to a given range
 
 # DATA SET SPLITTING -----------------------------------------------------------------------
