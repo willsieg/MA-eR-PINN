@@ -12,21 +12,6 @@
 #     name: python3
 # ---
 
-global IS_NOTEBOOK
-IS_NOTEBOOK = False
-try:    # if running in IPython
-    shell = get_ipython().__class__.__name__ # type: ignore 
-
-    from IPython.display import display, HTML, Javascript
-    from IPython.core.magic import register_cell_magic
-    @register_cell_magic    # cells can be skipped by using '%%skip' in the first line
-    def skip(line, cell): return
-    from tqdm.notebook import tqdm # type: ignore
-    IS_NOTEBOOK = True
-except (NameError, ImportError):    # if running in script
-    from tqdm import tqdm
-    from tabulate import tabulate
-    print(f"{'-'*60}\nRunning in script mode")
 # +
 import pandas as pd
 import numpy as np
@@ -38,19 +23,23 @@ from scipy.signal import savgol_filter
 from scipy.stats import zscore, median_abs_deviation
 import pyarrow.parquet as pq 
 
+from IPython.core.magic import register_cell_magic
+@register_cell_magic
+def skip(line, cell):   # cells can be skipped by using '%%skip' in the first line
+    return
 
 
 # -
 
 # ------------ LOCATE REPOSITORY/DATASTORAGE IN CURRENT SYSTEM ENVIRONMENT  --------------
 import sys, os; from pathlib import Path                                                #|
-global ROOT, DATA_PATH                            #|
-ROOT = Path('.').resolve() if IS_NOTEBOOK else Path('.').resolve()                      #|
+global ROOT, DATA_PATH, IS_NOTEBOOK; IS_NOTEBOOK = True                                 #|
+ROOT = Path('..').resolve() if IS_NOTEBOOK else Path('.').resolve()                     #|
+print(f"{'-'*60}\n{ROOT}:\t{', '.join([_.name for _ in ROOT.glob('*/')])}")             #|
 sys.path.append(os.path.abspath(ROOT))                                                  #|
 from data import get_data_path  # paths set in "data/__init__.py"                       #|
 DATA_PATH = get_data_path()                                                             #|
-print(f"{'-'*60}\n{DATA_PATH}:\t{', '.join([_.name for _ in DATA_PATH.glob('*/')])}") #|
-print(f"{ROOT}:\t{', '.join([_.name for _ in ROOT.glob('*/')])}")   	                #|
+print(f"{DATA_PATH}:\t\t{', '.join([_.name for _ in DATA_PATH.glob('*/')])}")           #|
 # ----------------------------------------------------------------------------------------
 
 # +
@@ -61,9 +50,9 @@ from src.physics_model.VehModel import CreateVehicle
 parquet_folder = Path(DATA_PATH, "processed") # Trip parquet files
 
 # OUTPUT LOCATIONS ---------------------------------------------------------------
-trips_processed_final = Path(DATA_PATH, "final", "trips_processed_final") # Trip parquet files
-trips_processed_resampled = Path(DATA_PATH, "final", "trips_processed_resampled") # Trip parquet filesn for resampled time series
-trips_processed_pickles = Path(DATA_PATH, "final", "trips_processed_pickles") # Trip parquet files
+trips_processed_final = Path(DATA_PATH, "final_2", "trips_processed_final") # Trip parquet files
+trips_processed_resampled = Path(DATA_PATH, "final_2", "trips_processed_resampled") # Trip parquet filesn for resampled time series
+trips_processed_pickles = Path(DATA_PATH, "final_2", "trips_processed_pickles") # Trip parquet files
 
 
 # +
@@ -123,6 +112,7 @@ remove_signals = {"minmoduletempindex_bms01", "maxmoduletempindex_bms01", "brc_s
 redundant_signals = {"hirestotalvehdist_cval_cpc", 'ambtemp_cval_pt', 'grshift_stat_pt', 'currgr_stat_edcu', 'edrvspd_cval', 'hv_bat_dc_maxvoltlim_cval',
  'hv_bat_dc_minvoltlim_cval', 'ignsw_stat_sca', 'plugchrg_stat'}
 
+# also remove:
 #'hv_batmomavlchrgen_cval_bms1'
 
 # interrelated signal pairs can be combined to only introduce one variable (no status signals):
@@ -197,7 +187,10 @@ print('Keep no. signals: ', len(all_columns) - len(drop_signals))
 signal_remove_outliers = ["latitude_cval_ippc", "longitude_cval_ippc","altitude_cval_ippc","roadgrad_cval_pt", 
 "bs_roadincln_cval","hirestotalvehdist_cval_icuc","vehspd_cval_cpc", "hv_batmomavldischrgen_cval_1",
 "hv_bat_soc_cval_bms1", "airtempinsd_cval_hvac", "airtempoutsd_cval_cpc", "hv_batavcelltemp_cval_bms1",
-"hv_bathighcelltemp_cval_bms1","hv_batlowcelltemp_cval_bms1"]
+"hv_bathighcelltemp_cval_bms1","hv_batlowcelltemp_cval_bms1", 
+# new added:
+"hv_dclink_volt_cval_dcl1", "actualdcvoltage_pti1", "hv_bat_dc_momvolt_cval_bms1",
+"hv_batmaxchrgpwrlim_cval_1", "hv_batmaxdischrgpwrlim_cval_1"]
 
 
 # +
@@ -223,11 +216,11 @@ def smooth_filter(X, ws, remove_outliers = True, smooth = True):
         else:
             thresh_new = None
 
-        if X_filtered.nunique() < 2:
-            X_filtered.fillna(X_filtered.mean(), inplace=True)
-        else:
-            X_filtered.ffill(inplace=True)
-            X_filtered.bfill(inplace=True)  
+        #if X_filtered.nunique() < 2:
+        #    X_filtered.fillna(X_filtered.mean(), inplace=True)
+        #else:
+        X_filtered.ffill(inplace=True)
+        X_filtered.bfill(inplace=True)  
 
         return X_filtered, X_noise, thresh_new
 
@@ -407,9 +400,9 @@ for n, f in enumerate(trips):
     
     # Save new dataframes
     ############################################################################################
-    df.drop(columns = ['hv_batmomavlchrgen_cval_bms1'], inplace=True)
+    df.drop(columns = ['hv_batmomavlchrgen_cval_bms1', 'hv_bat_soh_cval_bms1'], inplace=True)
     df.to_parquet(f'{trips_processed_final}/{prefix + file_code}.parquet')
-    df_resampled.drop(columns = ['hv_batmomavlchrgen_cval_bms1'], inplace=True)
+    df_resampled.drop(columns = ['hv_batmomavlchrgen_cval_bms1', 'hv_bat_soh_cval_bms1'], inplace=True)
     df_resampled.to_parquet(f'{trips_processed_resampled}/{prefix + file_code}.parquet')
     print(f'{prefix + file_code} saved')
 
@@ -425,17 +418,16 @@ columns_selection = ["signal_time",
             "hv_batmomavldischrgen_cval_1"]
 
 # +
+# plot multiple random time series signals from random files
 import matplotlib.pyplot as plt
 import random
 
-samples = random.sample(trips, 10)
-signal  = random.choice(columns)
-
-for f in samples:
-    df = pd.read_parquet(Path(trips_processed_resampled, f), engine='fastparquet')
-    _ = df[signal].plot(figsize=(18, 2), subplots=True, title=signal)
-    plt.show()
-
+for sig in ["hv_dclink_volt_cval_dcl1"]:
+    samples = random.sample(trips, 10)
+    for f in samples:
+        df = pd.read_parquet(Path(trips_processed_resampled, f), engine='fastparquet')
+        _ = df[sig].plot(figsize=(18, 5), subplots=True, title=sig)
+        plt.show()
 
 
 # +
@@ -452,7 +444,7 @@ def check_nans_in_parquet_files(directories):
 
     return files_with_nans
 
-directories = [trips_processed_resampled, trips_processed_final]
+directories = [Path(DATA_PATH, "final", "trips_processed_resampled"), Path(DATA_PATH, "final", "trips_processed_final")]
 files_with_nans = check_nans_in_parquet_files(directories)
 
 print("Files with NaNs:")
@@ -461,12 +453,14 @@ for file in files_with_nans:
 
 # +
 total_values_count = 0
+trips = get_files(trips_processed_final, ".parquet", full=True)
 
 for trip_file in trips:
     metadata = pq.read_metadata(Path(parquet_folder, trip_file))
     total_values_count += metadata.num_rows * metadata.num_columns
 
 print(f"Total number of values in all trip files: {total_values_count}")
+print(f"Average file length: {round(total_values_count / (len(trips) * metadata.num_columns))}")
 
 
 
