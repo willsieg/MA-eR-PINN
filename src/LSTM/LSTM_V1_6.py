@@ -58,7 +58,7 @@ from pathlib import Path
 from copy import deepcopy
 from datetime import datetime
 
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
@@ -76,7 +76,7 @@ from torch.nn.utils.rnn import pack_sequence
 from torch.utils.data import DataLoader, TensorDataset, Dataset, random_split
 from torchmetrics.functional import mean_squared_error
 torch.set_default_dtype(torch.float32)
-torch.manual_seed(1);
+torch.manual_seed(2);
 
 # METRICS ---------------------------------------------------------------------
 from sklearn.metrics import root_mean_squared_error
@@ -170,20 +170,17 @@ class TripDataset(Dataset):
         self.data = []
         self.targets = []
 
-        print(f"fitting Scalers: {scaler.__class__.__name__}, {target_scaler.__class__.__name__}")
         if self.fit:
+            print(f"fitting Scalers: {scaler.__class__.__name__}, {target_scaler.__class__.__name__}")
             # Initialize and Fit the scalers on the complete training data set
             # Fit the scalers incrementally to avoid memory errors
             for file in self.file_list:
                 df = pd.read_parquet(file, engine='fastparquet')
                 X = df[input_columns].values
                 y = df[target_column].values.reshape(-1, 1)  # Reshape to match the shape of the input
-
-                # Fit the scalers incrementally
                 self.scaler.partial_fit(X)
                 self.target_scaler.partial_fit(y)
-
-            print(f"Done.")
+            print(f"Done. Create DataSets...")
 
         for file in self.file_list:
             # DATA PREPROCESSING -----------------------------------------------------------
@@ -191,11 +188,9 @@ class TripDataset(Dataset):
             df = pd.read_parquet(file, engine='fastparquet')
             X = df[input_columns].values
             y = df[target_column].values.reshape(-1, 1)  # Reshape to match the shape of the input
-            
             # use the previously fitted scalers to transform the data
-            X = self.scaler.transform(X)    
+            X = self.scaler.transform(X)  
             y = self.target_scaler.transform(y).squeeze()
-            
             # Append to data
             self.data.append(X)
             self.targets.append(y.squeeze())
@@ -216,26 +211,23 @@ class TripDataset(Dataset):
         raise IndexError("Index out of range")
 
 
-# FEATURE NORMALIZATION/SCALING -----------------------------------------------------------------
-# Transform features by scaling each feature to a given range
-scaler = MinMaxScaler(feature_range=(0, 1))    # Standardize features by removing the mean and scaling to unit variance
-target_scaler = MinMaxScaler(feature_range=(0, 1))  #MinMaxScaler(feature_range=(0, 1))  
-
 # +
+# FEATURE NORMALIZATION/SCALING -----------------------------------------------------------------
+scaler = MaxAbsScaler() 
+target_scaler = MinMaxScaler(feature_range=(0, 1))
+
 # DATA SET SPLITTING -----------------------------------------------------------------------
 # train_subset, test_subset = train_test_split(files, test_size=0.2, random_state=1)
-train_subset, val_subset, test_subset = random_split(files, [0.8, 0.1, 0.1])
-subsets_split = (train_subset.dataset, val_subset.dataset, test_subset.dataset)
+train_subset, val_subset, test_subset = random_split(files, [0.8, 0.19, 0.01])
 
-train_files = [os.path.basename(files[i]) for i in train_subset.indices]
-print(train_files[:3])
+# SPECIFY BATCH SIZE  ---------------------------------------------------------------
+batch_size = 512 # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
 
 # +
 # GENERATE DATALOADERS  ---------------------------------------------------------------
-batch_size = 1024 # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
 # Note:
-# the scaler will be fitted only on the training data set
-# shuffling is prohibited to maintain the time series order
+#   the scaler will be fitted only on the training data set
+#   shuffling is prohibited to maintain the time series order
 
 # TRAIN  ------------------------------------------------------------
 train_dataset = TripDataset(train_subset, scaler, target_scaler, fit=True)
@@ -254,9 +246,14 @@ print(f"{'-'*60}\nTrain size:  {len(train_dataset)}\t\t(Files: {len(train_subset
 print(f'Val. size:   {len(val_dataset)}\t\t(Files: {len(val_subset)})')
 print(f'Test size:   {len(test_dataset)}\t\t(Files: {len(test_subset)})')
 if train_dataset.__len__() != sum(len(data) for data in train_dataset.data): print("Warning: Train Dataset Length Mismatch")
-
-
 # -
+
+subset_files = {
+    "train": list(train_loader.dataset.file_list),
+    "val": list(val_loader.dataset.file_list),
+    "test": list(test_loader.dataset.file_list)}
+print([os.path.basename(_) for _ in subset_files["train"][:3]])
+
 
 # ___
 # NETWORK ARCHITECTURE
@@ -353,8 +350,8 @@ class FCNN(nn.Module):
 
 # LAYERS --------------------------------
 input_size = len(input_columns)     # expected features in the input x
-hidden_size = 16                    # features in the hidden state h
-num_layers = 3                      # recurrent layers for stacked LSTMs. Default: 1
+hidden_size = 200                   # features in the hidden state h
+num_layers = 2                      # recurrent layers for stacked LSTMs. Default: 1
 num_classes = 1                     # output classes (=1 for regression)
 
 # INSTANTIATE MODEL --------------------
@@ -370,12 +367,12 @@ print(f"{'-'*60}\n",model)
 global NUM_EPOCHS
 
 # HYPERPARAMETERS ------------------------------------------------------------
-NUM_EPOCHS = 40
+NUM_EPOCHS = 10
 learning_rate = 1e-2 # 0.001 lr
 
 # OPTIMIZER -----------------------------
 optimizer = torch.optim.AdamW(model.parameters(), lr = learning_rate,
-    weight_decay = 1e-5      # weight decay coefficient (default: 1e-2)
+    weight_decay = 1e-4      # weight decay coefficient (default: 1e-2)
     #betas = (0.9, 0.95),    # coefficients used for computing running averages of gradient and its square (default: (0.9, 0.999))
     #eps = 1e-8,             # term added to the denominator to improve numerical stability (default: 1e-8)
 )
@@ -579,37 +576,43 @@ trained = train_model(
 
 # +
 # SAVE MODEL  -----------------------------------------------------------------
-# add the splitted data subset information to save dict
-trained['subsets_split'] = subsets_split
-
 # create unique model name
 model_name = f'{model.__class__.__name__}_{datetime.now().strftime("%y%m%d_%H%M%S")}'
 model_destination_path = Path(pth_folder, model_name + ".pth")
 
+# add the splitted data subset information to save dict
+trained['subset_files'] = subset_files
 # save the model & print info
 torch.save(trained, model_destination_path)
 print(f"Model saved to:\t {model_destination_path}\nSize: {os.path.getsize(model_destination_path) / 1e6:.2f} MB")
 if os.path.getsize(model_destination_path) > 100 * 1024**2:
     print("--> Warning: The saved model size exceeds 100MB!")
+# -
 
-# +
 # LOAD MODEL AT CHECKPOINT -----------------------------------------------------------------
-#model_destination_path = Path(pth_folder, "LSTM1_241102_232814.pth")
+# Select Model to Load:
+#model_destination_path = Path(pth_folder, "LSTM_V1_6_hs256.pth")
 # -----------------------------------------------------------------
 checkpoint = torch.load(model_destination_path, weights_only=False)
-
 for key in ["model", "loss_fn", "training_table", "train_losses", "val_losses", "epoch"]:
     globals()[key] = checkpoint[key]
-model.eval(); # set model to evaluation mode for inference
+# configure model and optimizer:
 model.load_state_dict(checkpoint['model_state_dict'])
 optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-test_files = checkpoint["subsets_split"][2]
+model.eval(); # set model to evaluation mode for inference
+print(f"Model loaded from:\t {model_destination_path}\n{'-'*60}")
+print(f"Model: {model.__class__.__name__}\t\tParameters on device: {next(model.parameters()).device}\n{'-'*60}")
+# get file list of test subset
+test_files = checkpoint["subset_files"]["test"]
+
+# Move the model and its parameters to the CPU
+model.to('cpu')
+DEVICE = torch.device('cpu')
 
 # +
-# %%skip
 # RESUME TRAINING -----------------------------------------------------------------
-'''resume = True
-if resume: NUM_EPOCHS += 2 # train for 2 more epochs
+resume = True
+if resume: NUM_EPOCHS += 5 # train for 2 more epochs
 
 trained = train_model(
     model = model, 
@@ -617,28 +620,25 @@ trained = train_model(
     loss_fn = loss_fn, 
     train_loader = train_loader,
     val_loader = val_loader,
-    state = checkpoint if resume else None)'''
+    state = checkpoint if resume else None)
 
 # +
 # get DataFrame of training metrics:
 training_df = pd.DataFrame(training_table, columns=["Epoch", "Iteration", "Batch Loss", "Train Loss"])
 # Extract the 'Train Loss' column and compare with the train_losses list
 train_loss_column = training_df['Train Loss'].replace(['',' '], np.nan).dropna().astype(float).values
-if any(abs(train_loss_column - train_losses) > 1e-3): print("Extracted and original Train Losses are not equal. Please check metrics table.")
+if any(abs(train_loss_column - train_losses) > 1e-3): 
+    print("Extracted and original Train Losses are not equal. Please check metrics table.")
 
 # -------------------------------------
 # plot training performance:
-plt.style.use('ggplot')
 fig, ax1 = plt.subplots(figsize=(8,3))
-
-# Set x-axis to integers starting from 1
 ax1.set_xlabel('Epochs')
 ax1.set_xticks(range(1, NUM_EPOCHS + 1))
 
 plt.plot(range(1, NUM_EPOCHS + 1), train_losses, label='train_loss')
 plt.plot(range(1, NUM_EPOCHS + 1), val_losses, label='val_loss')
-plt.yscale('log')
-fig.tight_layout(); plt.legend();
+plt.style.use('ggplot'); plt.yscale('log'); fig.tight_layout(); plt.legend();
 # -
 
 # ___
@@ -668,7 +668,6 @@ print(f"Test Loss:  {test_loss:.4f}")
 print(f"Iterations: {iter}/{math.floor(len(test_loader.dataset) / test_loader.batch_size)}")
 
 # +
-test_files = list(test_loader.dataset.file_list)
 test_dataset = TripDataset(random.sample(test_files,1), scaler, target_scaler)
 test_loader_2 = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
