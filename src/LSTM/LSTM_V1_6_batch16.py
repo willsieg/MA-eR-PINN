@@ -221,7 +221,7 @@ target_scaler = MinMaxScaler(feature_range=(0, 1))
 train_subset, val_subset, test_subset = random_split(files, [0.8, 0.19, 0.01])
 
 # SPECIFY BATCH SIZE  ---------------------------------------------------------------
-batch_size = 64 # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
+batch_size = 32 # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
 
 # +
 # GENERATE DATALOADERS  ---------------------------------------------------------------
