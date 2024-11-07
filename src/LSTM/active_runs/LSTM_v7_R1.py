@@ -82,7 +82,7 @@ torch.manual_seed(datetime.now().second);
 # METRICS ---------------------------------------------------------------------
 from sklearn.metrics import root_mean_squared_error
 from torchmetrics.functional import mean_squared_error
-#from pytorch_forecasting.metrics import MASE
+from pytorch_forecasting.metrics import MASE
 
 # DARTS ---------------------------------------------------------------------
 from darts.metrics import mase
@@ -100,8 +100,8 @@ global DEVICE
 print(f"{'-'*60}\nTorch version: ", torch.__version__)
 print('Cuda available: ',torch.cuda.is_available())
 if torch.cuda.is_available():
-    DEVICE = torch.device(f"cuda") 
-    DEVICE = torch.device("cuda:2")   # or overwrite with explicit Core number
+    #DEVICE = torch.device(f"cuda") 
+    DEVICE = torch.device("cuda:0")   # or overwrite with explicit Core number
     print(f'Currently Selected Device: {torch.cuda.current_device()}')
 else:
     DEVICE = ("cpu")
@@ -158,9 +158,14 @@ columns_to_drop = ["hv_bat_soc_cval_bms1", "latitude_cval_ippc", "longitude_cval
 # ---------------------------------------------------
 target_column = "hv_batmomavldischrgen_cval_1"
 input_columns = all_signals.drop(columns_to_drop + [target_column])
-
-
 # -
+
+# SELECT RUN:
+input_columns = input_columns
+# input_columns = base_signals 
+# input_columns = ["vehspd_cval_cpc", "altitude_cval_ippc", "airtempoutsd_cval_cpc", "bs_roadincln_cval", "vehweight_cval_cpc",]
+# input_columns = [i for i in input_columns if i not in base_signals]
+
 
 # DATASET DEFINITION -----------------------------------------------------------------------
 class TripDataset(Dataset):
@@ -365,7 +370,7 @@ model = LSTM1(input_size, hidden_size, num_layers).to(DEVICE)  #, num_classes, s
 global NUM_EPOCHS
 
 # HYPERPARAMETERS ------------------------------------------------------------
-NUM_EPOCHS = 25
+NUM_EPOCHS = 40
 learning_rate = 5e-3 # 0.001 lr
 
 # OPTIMIZER -----------------------------
@@ -384,12 +389,9 @@ def loss_fn(model_output, target):
     return loss
 
 # or define criterion function:
-criterion1 = nn.MSELoss()
-criterion2 = nn.L1Loss()
-criterion3 = nn.SmoothL1Loss()
-criterion4 = nn.HuberLoss()
+criterion_list = [nn.MSELoss(), nn.L1Loss(), nn.SmoothL1Loss(), nn.HuberLoss(), MASE()]
 
-criterion = criterion3
+criterion = nn.SmoothL1Loss()
 
 # ------------------------------------------------------------------------------
 # print Model and Optimizer state_dicts
@@ -600,7 +602,7 @@ if os.path.getsize(model_destination_path) > 100 * 1024**2: print("--> Warning: 
 # +
 # LOAD MODEL AT CHECKPOINT -----------------------------------------------------------------
 # Select Model to Load:
-model_destination_path = Path(pth_folder, "LSTM1_241106_202042.pth")
+model_destination_path = Path(pth_folder, "LSTM1_241107_061140.pth")
 
 # -----------------------------------------------------------------
 checkpoint = torch.load(model_destination_path, weights_only=False)
@@ -616,6 +618,12 @@ print(f"Model: {model.__class__.__name__}\t\tParameters on device: {next(model.p
 
 # get file list of test subset
 test_files = checkpoint["subset_files"]["test"]
+# -
+
+print(f"Model: {model.__class__.__name__}\t\tParameters on device: {next(model.parameters()).device}\n{'-'*60}\n"
+        f"Train/Batch size:\t{len(train_loader.dataset)} / {train_loader.batch_size}\n"
+        f"Loss:\t\t\t{loss_fn}\nOptimizer:\t\t{optimizer.__class__.__name__}\nLR:\t\t\t"
+        f"{optimizer.param_groups[0]['lr']}\nWeight Decay:\t\t{optimizer.param_groups[0]['weight_decay']}\n{'-'*60}")
 
 # +
 # Move the model and its parameters to the CPU
@@ -626,7 +634,7 @@ DEVICE = torch.device('cuda:0')
 # -
 
 # RESUME TRAINING -----------------------------------------------------------------
-resume = True
+resume = False
 if resume: 
     NUM_EPOCHS += 20 # train for 2 more epochs
     trained = train_model(
@@ -654,7 +662,7 @@ ax1.set_xticks(range(1, NUM_EPOCHS + 1))
 
 plt.plot(range(1, NUM_EPOCHS + 1), train_losses, label='train_loss')
 plt.plot(range(1, NUM_EPOCHS + 1), val_losses, label='val_loss')
-plt.yscale('log'); fig.tight_layout(); plt.legend();
+plt.style.use('ggplot'); plt.yscale('log'); fig.tight_layout(); plt.legend();
 # -
 
 # ___
@@ -705,16 +713,14 @@ y_pred = target_scaler.inverse_transform(np.array(y_pred).reshape(-1, 1))
 y_true = target_scaler.inverse_transform(np.array(test_loader_2.dataset.targets[0]).reshape(-1, 1))
 
 ###############################################
-print(f"RMSE: {root_mean_squared_error(y_true, y_pred):.4f}")
-
 # PLOT PREDICTION -----------------------------------------------------------------
 plt.figure(figsize=(18,4)); plt.xlabel('Time in s'); plt.ylabel('Battery Energy in kWh'); plt.title('Time-Series Prediction')
 plt.plot(y_true, label='Actual Data') # actual plot
 plt.plot(np.arange(0, len(y_true), 1), y_pred, label='Predicted Data') # predicted plot
-plt.legend();
+plt.legend()
+plt.text(0.01, 0.02, f"RMSE: {root_mean_squared_error(y_true, y_pred):.4f}", transform=plt.gca().transAxes, fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
 
 plt.figure(figsize=(18,4)); plt.xlabel('Time in s'); plt.ylabel('Battery Energy in kWh'); plt.title('Time-Series Prediction (Smoothed)')
 plt.plot(savgol_filter(y_true.flatten(), window_length=60, polyorder=3), label='Actual Data (Smoothed)') # actual plot
 plt.plot(np.arange(0, len(y_true), 1), savgol_filter(y_pred.flatten(), window_length=60, polyorder=3), label='Predicted Data (Smoothed)') # predicted plot
 plt.legend();
-
