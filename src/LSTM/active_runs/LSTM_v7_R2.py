@@ -162,7 +162,7 @@ input_columns = all_signals.drop(columns_to_drop + [target_column])
 
 # SELECT RUN:
 # input_columns = input_columns
-input_columns = base_signals 
+input_columns = ["hirestotalvehdist_cval_icuc", "vehspd_cval_cpc", "altitude_cval_ippc", "airtempoutsd_cval_cpc", "hv_batpwr_cval_bms1", "emot_pwr_cval","bs_roadincln_cval", "roadgrad_cval_pt"]
 # input_columns = ["vehspd_cval_cpc", "altitude_cval_ippc", "airtempoutsd_cval_cpc", "bs_roadincln_cval", "vehweight_cval_cpc",]
 # input_columns = [i for i in input_columns if i not in base_signals]
 
