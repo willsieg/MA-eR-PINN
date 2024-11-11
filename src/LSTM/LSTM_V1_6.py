@@ -106,7 +106,7 @@ print(f"   --> Using {DEVICE} device")
 
 # ------------ LOCATE REPOSITORY/DATASTORAGE IN CURRENT SYSTEM ENVIRONMENT  --------------
 global ROOT, DATA_PATH
-ROOT = Path('../..').resolve()
+ROOT = Path('../..').resolve() #if IS_NOTEBOOK else Path('.').resolve()
 print(f"{'-'*60}\n{ROOT}:\t{', '.join([_.name for _ in ROOT.glob('*/')])}")
 sys.path.append(os.path.abspath(ROOT))
 from data import get_data_path  # paths set in "data/__init__.py"
