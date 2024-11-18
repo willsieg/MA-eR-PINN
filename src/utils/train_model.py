@@ -4,6 +4,8 @@ import math
 import torch
 from torch.utils.data import DataLoader
 import torch.nn as nn
+from tqdm import tqdm
+from tabulate import tabulate
 
 
 # TRAINING ROUTINE DEFINITION -----------------------------------------------------------------
@@ -15,6 +17,7 @@ def train_model(model, optimizer, scheduler, loss_fn, train_loader, num_epochs, 
     else:
         from tqdm import tqdm
         from tabulate import tabulate
+        print('imported tqdm')
 
     def validate_model(model, val_loader, loss_fn):
         model.eval()  # Set model to evaluation mode
