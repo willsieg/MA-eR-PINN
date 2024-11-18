@@ -13,6 +13,23 @@ def estimate_mot_pwr(speed,                 # v(t): [m/s]
                      eta_mot = 1,           # 0 <= 1, default = 1   # Motor Efficiency Factor (mechanical <-> electrical)
                      ):
     
+    '''
+    EXPLANATION:
+
+    RECUPERATION --------------------------------------------------------------------------------------
+                                Wheels      Drivetrain                      Motor                                     Battery
+
+    [INPUT DATA]  --(f(t))-->  [P_mech]  --(eta_mech)-->  [P_mot_out]  --(eta_mot)-->  [P_mot_in]  --(eta_recup)-->  [P_Bat]
+                                  < 0
+
+                                  
+    TRACTION ----------------------------------------------------------------------------------
+                                Wheels      Drivetrain                      Motor                                  Battery 
+
+    [INPUT DATA]  <--(f(t))--  [P_mech]  <--(eta_mech)--    [P_mot_out]  <--(eta_mot)--    [P_mot_in]  <--( eta_el = ??)--     [P_Bat]
+    [INPUT DATA]  --(f(t))-->  [P_mech]  --(1/eta_mech)-->  [P_mot_out]  --(1/eta_mot)-->  [P_mot_in]  --(1/eta_el)-->      [P_Bat]
+                                    > 0
+    '''
     ################################################################################################
     # constants:
     g_amb = 9.81    # [m/s²]
@@ -64,6 +81,9 @@ def estimate_mot_pwr(speed,                 # v(t): [m/s]
     # electrical Power of Motor [kW]:
     P_el = P_mech / eta_total
 
+    # apply an additional conversion factor for recuperational motor operation:
+    eta_recup = 0.85    # 85% efficiency for recuperation
+
     ################################################################################################
     '''
     SERVICE BRAKE LOSS
@@ -79,6 +99,10 @@ def estimate_mot_pwr(speed,                 # v(t): [m/s]
      | -250 ... -350 | 90 %            |
      | -350 ... -450 | 75 %            |
      | < -450        | 50 %            |
+
+    Alternatively, apply a constant additional conversion factor for recuperational motor operation:
+    eta_recup = 0.85    # 85% efficiency for recuperation
+
     '''
     recup_eff = 1 - ((P_mech < -250) * 0.1) - ((P_mech < -350) * 0.15)- ((P_mech < -450) * 0.25)
 
