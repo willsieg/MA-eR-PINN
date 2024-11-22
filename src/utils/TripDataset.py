@@ -12,22 +12,24 @@ class TripDataset(Dataset):
         self.data = []
         self.targets = []
 
+        # fitting scalers over complete training dataset
         if self.fit:
             print(f"fitting Scalers: {scaler.__class__.__name__}, {target_scaler.__class__.__name__}")
             # Initialize and Fit the scalers on the complete training data set
             # Fit the scalers incrementally to avoid memory errors
             for file in self.file_list:
-                df = pd.read_parquet(file, engine='fastparquet')
+                df = pd.read_parquet(file, columns = input_columns+[target_column], engine='fastparquet')
                 X = df[input_columns].values
                 y = df[target_column].values.reshape(-1, 1)  # Reshape to match the shape of the input
                 self.scaler.partial_fit(X)
                 self.target_scaler.partial_fit(y)
             print(f"Done. Create DataSets...")
 
+        # transform with fitted scalers
         for file in self.file_list:
             # DATA PREPROCESSING -----------------------------------------------------------
             # Assigning inputs and targets and reshaping ---------------
-            df = pd.read_parquet(file, engine='fastparquet')
+            df = pd.read_parquet(file, columns = input_columns+[target_column], engine='fastparquet')
             X = df[input_columns].values
             y = df[target_column].values.reshape(-1, 1)  # Reshape to match the shape of the input
             # use the previously fitted scalers to transform the data
