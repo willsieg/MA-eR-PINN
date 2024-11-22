@@ -27,22 +27,22 @@ from pathlib import Path
 # SETTINGS ---------------------------------------------------------------------
 CONFIG = {
     # SYSTEM: ---------------------------------------------------------------------
-    "GPU_SELECT":       0, # {None, 0,1,2,3}, None: CPU only
+    "GPU_SELECT":       1, # {None, 0,1,2,3}, None: CPU only
     "INPUT_LOCATION":   Path("TripSequences", "trips_processed_resampled"),
     "PTH_LOCATION":     Path("src", "models", "pth"),
 
     # PREPROCESSING: --------------------------------------------------------------
     "TRAIN_VAL_TEST":   [0.8, 0.15, 0.05], # [train, val, test]
-    "MAX_FILES":        5000, #None, # None: all files
+    "MAX_FILES":        10000, #None, # None: all files
     
     # TORCH: ----------------------------------------------------------------------
     "TORCH_SEED"  :     42,
-    "BATCH_SIZE":       128,   # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
-    "NUM_EPOCHS":       10,
-    "LEARNING_RATE":    5e-3,   # 0.001 lr
-    "HIDDEN_SIZE":      128,
+    "BATCH_SIZE":       64,   # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
+    "NUM_EPOCHS":       80,
+    "LEARNING_RATE":    4e-4,   # 0.001 lr
+    "HIDDEN_SIZE":      200,
     "NUM_LAYERS":       2,
-    "DROPOUT":          0.4,
+    "DROPOUT":          0.5,
     "SEQ_LEN":          100
 }
 
@@ -163,7 +163,7 @@ trip_lengths = []
 for file in files:
     trip_rows = pq.read_metadata(file).num_rows
     trip_lengths.append(trip_rows)
-    if trip_rows >= 600/5:
+    if trip_rows >= 1200/5:
         filtered_files.append(file)
 
 files = filtered_files
@@ -187,7 +187,7 @@ columns_to_drop = ["hv_batmomavldischrgen_cval_1", "latitude_cval_ippc", "longit
 
 # ---------------------------------------------------
 target_column = "hv_bat_soc_cval_bms1"
-input_columns = selection_1
+input_columns = selection_1 + ["hv_batpwr_cval_bms1", "emot_pwr_cval"]
 
 # ---------------------------------------------------
 # SELECT RUN:
