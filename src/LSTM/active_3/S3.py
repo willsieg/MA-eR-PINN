@@ -27,7 +27,7 @@ from pathlib import Path
 # SETTINGS ---------------------------------------------------------------------
 CONFIG = {
     # SYSTEM: ---------------------------------------------------------------------
-    "GPU_SELECT":       0, # {None, 0,1,2,3}, None: CPU only
+    "GPU_SELECT":       2, # {None, 0,1,2,3}, None: CPU only
     "INPUT_LOCATION":   Path("TripSequences", "trips_processed_resampled"),
     "PTH_LOCATION":     Path("src", "models", "pth"),
 
@@ -37,9 +37,9 @@ CONFIG = {
     
     # TORCH: ----------------------------------------------------------------------
     "TORCH_SEED"  :     42,
-    "BATCH_SIZE":       128,   # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
-    "NUM_EPOCHS":       10,
-    "LEARNING_RATE":    5e-3,   # 0.001 lr
+    "BATCH_SIZE":       512,   # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
+    "NUM_EPOCHS":       40,
+    "LEARNING_RATE":    5e-4,   # 0.001 lr
     "HIDDEN_SIZE":      128,
     "NUM_LAYERS":       2,
     "DROPOUT":          0.4,
