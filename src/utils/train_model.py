@@ -1,131 +1,361 @@
-import os
-import time
-import math
-import torch
-from torch.utils.data import DataLoader
+import os, time, math, torch
 import torch.nn as nn
-from tqdm import tqdm
+from torch.utils.data import DataLoader
+from torchrl.trainers import Trainer as TorchRLTrainer
+from tqdm.notebook import tqdm as tqdm_nb
+from tqdm import tqdm as tqdm
+from IPython.display import HTML, display_html
 from tabulate import tabulate
+if torch.cuda.is_available(): from torch.cuda.amp import GradScaler, autocast
 
 
-# TRAINING ROUTINE DEFINITION -----------------------------------------------------------------
-def train_model(model, optimizer, scheduler, loss_fn, train_loader, num_epochs, device, is_notebook, val_loader = None, state=None):
+#############################################################################################################
+# -----------------------------------------------------------------------------------------------------------
+class Trainer(TorchRLTrainer):
 
-    if is_notebook:
-        from IPython.display import display, HTML, Javascript
-        from tqdm.notebook import tqdm
-    else:
-        from tqdm import tqdm
-        from tabulate import tabulate
-        print('imported tqdm')
+    def __init__(self, model: nn.Module, optimizer: torch.optim.Optimizer, loss_fn: nn.Module, 
+                 train_loader: DataLoader, num_epochs: int, device: torch.device, 
+                 is_notebook: bool = False, val_loader: DataLoader = None, 
+                 scheduler: torch.optim.lr_scheduler._LRScheduler = None, state: dict = None, 
+                 use_mixed_precision: bool = False, clip_value = None):
 
-    def validate_model(model, val_loader, loss_fn):
-        model.eval()  # Set model to evaluation mode
+        self.model = model
+        self.optimizer = optimizer
+        self.loss_fn = loss_fn
+        self.train_loader = train_loader
+        self.num_epochs = num_epochs
+        self.device = device
+        self.is_notebook = is_notebook
+        self.val_loader = val_loader
+        self.scheduler = scheduler
+        self.state = state
+        self.use_mixed_precision = use_mixed_precision if torch.cuda.is_available() else False
+        if self.use_mixed_precision: self.scaler = GradScaler()  # Initialize GradScaler
+        self.clip_value = clip_value
+
+    def validate_model(self, epoch: int) -> float:
+        self.model.eval()  # Set model to evaluation mode
         val_loss = 0.0
         with torch.no_grad():  # Disable gradient calculation
-            for inputs, targets in val_loader:
-                inputs, targets = inputs.to(device), targets.to(device)
-                outputs = model(inputs)
-                loss = loss_fn(outputs.squeeze(), targets)
+            for inputs, targets in self.val_loader:
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
+                outputs = self.model(inputs)
+                loss = self.loss_fn(outputs.squeeze(), targets)
                 val_loss += loss.item()
-        
-        val_loss /= len(val_loader)  # Calculate average validation loss
-        scheduler.step(val_loss)    # Adjust learning rate based on validation loss
+        val_loss /= len(self.val_loader)  # Calculate average validation loss
+        if self.scheduler:
+            lr1 = self.scheduler.get_last_lr()[0]
+            self.scheduler.step(val_loss)  # Adjust learning rate based on validation loss
+            lr2 = self.scheduler.get_last_lr()[0]
+            self.lr_history.append(lr2)
+            if lr1 != lr2:
+                print(f"Learning rate updated after epoch {epoch}: {lr1} -> {lr2}")
         return val_loss
 
-    # output info on training process
-    print(f"Training Started.\tProcess ID: {os.getpid()} \n{'-'*60}\n"
-        f"Model: {model.__class__.__name__}\t\tParameters on device: {str(next(model.parameters()).device).upper()}\n{'-'*60}\n"
-        f"Train/Batch size:\t{len(train_loader.dataset)} / {train_loader.batch_size}\n"
-        f"Loss:\t\t\t{loss_fn}\nOptimizer:\t\t{optimizer.__class__.__name__}\nLR:\t\t\t"
-        f"{optimizer.param_groups[0]['lr']}\nWeight Decay:\t\t{optimizer.param_groups[0]['weight_decay']}\n{'-'*60}")
-
-    # Load state dict if provided
-    start_epoch = 1
-    if state:
-        model.load_state_dict(state['model_state_dict'])
-        optimizer.load_state_dict(state['optimizer_state_dict'])
-        start_epoch = state['epoch'] + 1
-        train_losses = state['train_losses']
-        val_losses = state['val_losses']
-        training_table = state['training_table']
-    else:
-        train_losses, val_losses, training_table = [], [], []  # collect loss
-        if is_notebook: display(HTML(initialize_table()))
-
-    # TRAINING LOOP:
-    start_time = time.perf_counter()
-    for epoch in range(start_epoch, num_epochs + 1):
-        model.train()   # set model to training mode
-        running_loss = 0.0
-        num_iterations = math.ceil(len(train_loader.dataset) / train_loader.batch_size)
-        header_printed = False
+    # TRAINING ROUTINE DEFINITION -----------------------------------------------------------------
+    def train_model(self) -> dict:
+       # output info on training process
+        print(f"{'-'*60}\nTraining Started.\tProcess ID: {os.getpid()} \n{'-'*60}\n"
+              f"Model: {self.model.__class__.__name__}\t\tParameters on device: {str(next(self.model.parameters()).device).upper()}\n{'-'*60}\n"
+              f"Train/Batch size:\t{len(self.train_loader.dataset)} / {self.train_loader.batch_size}\n"
+              f"Loss:\t\t\t{self.loss_fn}\nOptimizer:\t\t{self.optimizer.__class__.__name__}\nLR:\t\t\t"
+              f"{self.optimizer.param_groups[0]['lr']}\nWeight Decay:\t\t{self.optimizer.param_groups[0]['weight_decay']}\n{'-'*60}")
         
-        with tqdm(enumerate(train_loader, 1), unit="batch", total=num_iterations, leave=False) as tepoch:
-            for iter, (inputs, targets) in tepoch:
-                tepoch.set_description(f"Epoch {epoch}/{num_epochs}")
-
-                # -------------------------------------------------------------
-                # Move data to the GPU
-                inputs, targets = inputs.to(device), targets.to(device)  
-                # zero gradients -> forward pass -> obtain loss function -> apply backpropagation -> update weights:
-                optimizer.zero_grad()
-                outputs = model(inputs) 
-                loss = loss_fn(outputs.squeeze(), targets) 
-                loss.backward() 
-                # nn.utils.clip_grad_value_(model.parameters(), clip_value=1.0) # optional: Gradient Value Clipping
-                optimizer.step()
-
-                # -------------------------------------------------------------
-                # Update the performance table
-                if iter % (num_iterations//4) == 0 and iter != num_iterations//4*4:
-                    add_row(training_table, f" ", f"{iter}",f"{loss.item():.6f}", " ")
-                    if is_notebook:
-                        display(Javascript(f"""addRow("", "{iter}", "{loss.item():.6f}", "");"""))
-                    else:
-                        print_row(training_table)
-                elif iter == 1:
-                    add_row(training_table, f"{epoch}/{num_epochs}", f"{iter}/{num_iterations}",f"{loss.item():.6f}", " ")
-                    if is_notebook:
-                        display(Javascript(f"""addRow("<b>{epoch}/{num_epochs}", "{iter}/{num_iterations}", "{loss.item():.6f}", "");"""))
-                    else:
-                        print_row(training_table)
-                        
-                # -------------------------------------------------------------
-                # Update running loss and progress bar
-                running_loss += loss.item() # acculumate loss for epoch
-                tepoch.set_postfix(loss=loss.item()); tepoch.update(1)
-
-        # Calculate average training loss for the epoch
-        avg_train_loss = running_loss / len(train_loader)
-        train_losses.append(avg_train_loss)
-
-        # Update the performance table
-        add_row(training_table, f" ", f"{iter}",f"{loss.item():.6f}", f"{avg_train_loss:6f}")
-        if is_notebook:
-            display(Javascript(f"""addRow("", "{iter}", "{loss.item():.6f}", "<b>{avg_train_loss:.6f}");"""))
+        # Load state dict if provided
+        start_epoch = 1
+        if self.state:
+            self.model.load_state_dict(self.state['model_state_dict'])
+            self.optimizer.load_state_dict(self.state['optimizer_state_dict'])
+            self.train_losses = self.state['train_losses']
+            self.lr_history = self.state['lr_history']
+            self.val_losses = self.state['val_losses']
+            self.training_table = self.state['training_table']
+            start_epoch = self.state['epoch'] + 1
         else:
-            print_row(training_table)
+            self.train_losses = [] 
+            self.val_losses = []  
+            self.training_table = []  
+            self.lr_history = []
+            if self.is_notebook: display_html(HTML(initialize_table()))
 
-        # VALIDATION
-        if val_loader:
-            val_loss = validate_model(model, val_loader, loss_fn)
-            val_losses.append(val_loss)
+        # TRAINING LOOP:
+        start_time = time.perf_counter()
+        for epoch in range(start_epoch, self.num_epochs + 1):
+            self.model.train()  # set model to training mode
+            running_loss = 0.0
+            num_iterations = math.ceil(len(self.train_loader.dataset) / self.train_loader.batch_size)
+            header_printed = False
+
+            tqdm_version = tqdm_nb if self.is_notebook else tqdm
+            with tqdm_version(enumerate(self.train_loader, 1), unit="batch", total=num_iterations, leave=False) as tepoch:
+                for iter, (inputs, targets) in tepoch:
+                    tepoch.set_description(f"Epoch {epoch}/{self.num_epochs}")
+
+                    # -------------------------------------------------------------
+                    # Move data to the GPU
+                    inputs, targets = inputs.to(self.device), targets.to(self.device)
+
+                    # zero gradients -> forward pass -> obtain loss function -> apply backpropagation -> update weights:
+                    self.optimizer.zero_grad()
+
+                    # A) use mixed precision calculation
+                    if self.use_mixed_precision:
+                        with autocast():  # Enable autocast for mixed precision training
+                            outputs = self.model(inputs)
+                            loss = self.loss_fn(outputs.squeeze(), targets)
+                        self.scaler.scale(loss).backward()  # Scale the loss and perform backward pass
+                        if self.clip_value is not None:
+                            nn.utils.clip_grad_value_(self.model.parameters(), clip_value=self.clip_value)  # optional: Gradient Value Clipping
+                        self.scaler.step(self.optimizer)  # Update model parameters
+                        self.scaler.update()  # Update the scale for next iteration
+
+                    # B) Normal precision calculation
+                    else:
+                        outputs = self.model(inputs)
+                        loss = self.loss_fn(outputs.squeeze(), targets)
+                        loss.backward()
+                        if self.clip_value is not None:
+                            nn.utils.clip_grad_value_(self.model.parameters(), clip_value=self.clip_value) # optional: Gradient Value Clipping
+                        self.optimizer.step()
+
+                    # -------------------------------------------------------------
+                    # Update the performance table
+                    if iter % (num_iterations // 4) == 0 and iter != num_iterations // 4 * 4:
+                        add_row(self.training_table, f" ", f"{iter}", f"{loss.item():.6f}", " ")
+                        if self.is_notebook:
+                            display_html(HTML(f"""<script>addRow("", "{iter}", "{loss.item():.6f}", "");</script>"""))
+                        else:
+                            print_row(self.training_table)
+                    elif iter == 1:
+                        add_row(self.training_table, f"{epoch}/{self.num_epochs}", f"{iter}/{num_iterations}", f"{loss.item():.6f}", " ")
+                        if self.is_notebook:
+                            display_html(HTML(f"""<script>addRow("<b>{epoch}/{self.num_epochs}", "{iter}/{num_iterations}", "{loss.item():.6f}", "");</script>"""))
+                        else:
+                            print_row(self.training_table)
+
+                    # -------------------------------------------------------------
+                    # Update running loss and progress bar
+                    running_loss += loss.item()  # accumulate loss for epoch
+                    tepoch.set_postfix(loss=loss.item())
+                    tepoch.update(1)
+
+            # Calculate average training loss for the epoch
+            avg_train_loss = running_loss / len(self.train_loader)
+            self.train_losses.append(avg_train_loss)
+
             # Update the performance table
-            add_row(training_table, f" ", f"Validation Loss:",f"{val_loss:.6f}", f"")
-            if is_notebook:
-                display(Javascript(f"""addRow("<b>Val", "Validation Loss:", "<b>{val_loss:.4f}", "");"""))
+            add_row(self.training_table, f" ", f"{iter}", f"{loss.item():.6f}", f"{avg_train_loss:.6f}")
+            if self.is_notebook:
+                display_html(HTML(f"""<script>addRow("", "{iter}", "{loss.item():.6f}", "<b>{avg_train_loss:.6f}");</script>"""))
             else:
-                print_row(training_table)
+                print_row(self.training_table)
 
-    print(f"{'-'*60}\nTraining Completed.\tExecution Time: {time.strftime('%H:%M:%S', time.gmtime(time.perf_counter() - start_time))}\n")
-    return {"train_losses": train_losses, "val_losses": val_losses, "epoch": epoch, "training_table": training_table, "model": model, 
-    "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(),"loss_fn": loss_fn}
+            # VALIDATION
+            if self.val_loader:
+                val_loss = self.validate_model(epoch)
+                self.val_losses.append(val_loss)
+                # Update the performance table
+                add_row(self.training_table, f"Val", f"Validation Loss:", f"{val_loss:.6f}", "")
+                if self.is_notebook:
+                    display_html(HTML(f"""<script>addRow("<b>Val", "Validation Loss:", "<b>{val_loss:.4f}", "");</script>"""))
+                else:
+                    print_row(self.training_table)
 
+        elapsed_time = round(time.perf_counter() - start_time)
+        print(f"{'-'*60}\nTraining Completed.\tExecution Time: {time.strftime('%H:%M:%S', time.gmtime(elapsed_time))}\n{'-'*60}\n")
+        return {
+            # model and optimizer states
+            "model": self.model,
+            "model_state_dict": self.model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            # training performance
+            "training_table": self.training_table,
+            "train_losses": self.train_losses,
+            "val_losses": self.val_losses,
+            'lr_history': self.lr_history,
+            # settings and meta data
+            "loss_fn": self.loss_fn,
+            "epoch": epoch,
+            "elapsed_train_time": elapsed_time
+        }
+
+
+'''#############################################################################################################
+# -----------------------------------------------------------------------------------------------------------
+class Trainer_packed(TorchRLTrainer):
+
+    def __init__(self, model: nn.Module, optimizer: torch.optim.Optimizer, loss_fn: nn.Module, 
+                 train_loader: DataLoader, num_epochs: int, device: torch.device, 
+                 is_notebook: bool = False, val_loader: DataLoader = None, 
+                 scheduler: torch.optim.lr_scheduler._LRScheduler = None, state: dict = None, 
+                 use_mixed_precision: bool = False, clip_value = None):
+
+        self.model = model
+        self.optimizer = optimizer
+        self.loss_fn = loss_fn
+        self.train_loader = train_loader
+        self.num_epochs = num_epochs
+        self.device = device
+        self.is_notebook = is_notebook
+        self.val_loader = val_loader
+        self.scheduler = scheduler
+        self.state = state
+        self.use_mixed_precision = use_mixed_precision if torch.cuda.is_available() else False
+        if self.use_mixed_precision: self.scaler = GradScaler()  # Initialize GradScaler
+        self.clip_value = clip_value
+
+    def validate_model(self, epoch: int) -> float:
+        self.model.eval()  # Set model to evaluation mode
+        val_loss = 0.0
+        with torch.no_grad():  # Disable gradient calculation
+            for inputs, targets in self.val_loader:
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
+                outputs = self.model(inputs)
+                loss = self.loss_fn(outputs.squeeze(), targets)
+                val_loss += loss.item()
+        val_loss /= len(self.val_loader)  # Calculate average validation loss
+        if self.scheduler:
+            lr1 = self.scheduler.get_last_lr()[0]
+            self.scheduler.step(val_loss)  # Adjust learning rate based on validation loss
+            lr2 = self.scheduler.get_last_lr()[0]
+            self.lr_history.append(lr2)
+            if lr1 != lr2:
+                print(f"Learning rate updated after epoch {epoch}: {lr1} -> {lr2}")
+        return val_loss
+
+    # TRAINING ROUTINE DEFINITION -----------------------------------------------------------------
+    def train_model(self) -> dict:
+       # output info on training process
+        print(f"{'-'*60}\nTraining Started.\tProcess ID: {os.getpid()} \n{'-'*60}\n"
+              f"Model: {self.model.__class__.__name__}\t\tParameters on device: {str(next(self.model.parameters()).device).upper()}\n{'-'*60}\n"
+              f"Train/Batch size:\t{len(self.train_loader.dataset)} / {self.train_loader.batch_size}\n"
+              f"Loss:\t\t\t{self.loss_fn}\nOptimizer:\t\t{self.optimizer.__class__.__name__}\nLR:\t\t\t"
+              f"{self.optimizer.param_groups[0]['lr']}\nWeight Decay:\t\t{self.optimizer.param_groups[0]['weight_decay']}\n{'-'*60}")
+        
+        # Load state dict if provided
+        start_epoch = 1
+        if self.state:
+            self.model.load_state_dict(self.state['model_state_dict'])
+            self.optimizer.load_state_dict(self.state['optimizer_state_dict'])
+            self.train_losses = self.state['train_losses']
+            self.lr_history = self.state['lr_history']
+            self.val_losses = self.state['val_losses']
+            self.training_table = self.state['training_table']
+            start_epoch = self.state['epoch'] + 1
+        else:
+            self.train_losses = [] 
+            self.val_losses = []  
+            self.training_table = []  
+            self.lr_history = []
+            if self.is_notebook: display_html(HTML(initialize_table()))
+
+        # TRAINING LOOP:
+        start_time = time.perf_counter()
+        for epoch in range(start_epoch, self.num_epochs + 1):
+            self.model.train()  # set model to training mode
+            running_loss = 0.0
+            num_iterations = math.ceil(len(self.train_loader.dataset) / self.train_loader.batch_size)
+            header_printed = False
+
+            tqdm_version = tqdm_nb if self.is_notebook else tqdm
+            with tqdm_version(enumerate(self.train_loader, 1), unit="batch", total=num_iterations, leave=False) as tepoch:
+                for iter, (inputs, targets, length) in tepoch:  # ----> note: (packed_inputs, padded_targets, lengths)
+                    tepoch.set_description(f"Epoch {epoch}/{self.num_epochs}")
+
+                    # -------------------------------------------------------------
+                    # Move data to the GPU
+                    inputs, targets = inputs.to(self.device), targets.to(self.device)
+
+                    # zero gradients -> forward pass -> obtain loss function -> apply backpropagation -> update weights:
+                    self.optimizer.zero_grad()
+
+                    # A) use mixed precision calculation
+                    if self.use_mixed_precision:
+                        with autocast():  # Enable autocast for mixed precision training
+                            outputs = self.model(inputs)   # inputs are packed, outputs are not ! --> see forward method in model
+                            loss = self.loss_fn(outputs.squeeze(), targets)
+                        self.scaler.scale(loss).backward()  # Scale the loss and perform backward pass
+                        if self.clip_value is not None:
+                            nn.utils.clip_grad_value_(self.model.parameters(), clip_value=self.clip_value)  # optional: Gradient Value Clipping
+                        self.scaler.step(self.optimizer)  # Update model parameters
+                        self.scaler.update()  # Update the scale for next iteration
+
+                    # B) Normal precision calculation
+                    else:
+                        print(f"Shape of inputs: {inputs.shape}")
+                        outputs = self.model(inputs)  # inputs are packed, outputs are not ! --> see forward method in model
+                        print(f"Shape of outputs: {inputs.shape}")
+                        loss = self.loss_fn(outputs, targets)  # UPDATE: outpts.squeeze() --> outputs
+                        loss.backward()
+                        if self.clip_value is not None:
+                            nn.utils.clip_grad_value_(self.model.parameters(), clip_value=self.clip_value)  # optional: Gradient Value Clipping
+                        self.optimizer.step()
+
+                    # -------------------------------------------------------------
+                    # Update the performance table
+                    if iter % (num_iterations // 4) == 0 and iter != num_iterations // 4 * 4:
+                        add_row(self.training_table, f" ", f"{iter}", f"{loss.item():.6f}", " ")
+                        if self.is_notebook:
+                            display_html(HTML(f"""<script>addRow("", "{iter}", "{loss.item():.6f}", "");</script>"""))
+                        else:
+                            print_row(self.training_table)
+                    elif iter == 1:
+                        add_row(self.training_table, f"{epoch}/{self.num_epochs}", f"{iter}/{num_iterations}", f"{loss.item():.6f}", " ")
+                        if self.is_notebook:
+                            display_html(HTML(f"""<script>addRow("<b>{epoch}/{self.num_epochs}", "{iter}/{num_iterations}", "{loss.item():.6f}", "");</script>"""))
+                        else:
+                            print_row(self.training_table)
+
+                    # -------------------------------------------------------------
+                    # Update running loss and progress bar
+                    running_loss += loss.item()  # accumulate loss for epoch
+                    tepoch.set_postfix(loss=loss.item())
+                    tepoch.update(1)
+
+            # Calculate average training loss for the epoch
+            avg_train_loss = running_loss / len(self.train_loader)
+            self.train_losses.append(avg_train_loss)
+
+            # Update the performance table
+            add_row(self.training_table, f" ", f"{iter}", f"{loss.item():.6f}", f"{avg_train_loss:.6f}")
+            if self.is_notebook:
+                display_html(HTML(f"""<script>addRow("", "{iter}", "{loss.item():.6f}", "<b>{avg_train_loss:.6f}");</script>"""))
+            else:
+                print_row(self.training_table)
+
+            # VALIDATION
+            if self.val_loader:
+                val_loss = self.validate_model(epoch)
+                self.val_losses.append(val_loss)
+                # Update the performance table
+                add_row(self.training_table, f"Val", f"Validation Loss:", f"{val_loss:.6f}", "")
+                if self.is_notebook:
+                    display_html(HTML(f"""<script>addRow("<b>Val", "Validation Loss:", "<b>{val_loss:.4f}", "");</script>"""))
+                else:
+                    print_row(self.training_table)
+
+        elapsed_time = round(time.perf_counter() - start_time)
+        print(f"{'-'*60}\nTraining Completed.\tExecution Time: {time.strftime('%H:%M:%S', time.gmtime(elapsed_time))}\n{'-'*60}\n")
+        return {
+            # model and optimizer states
+            "model": self.model,
+            "model_state_dict": self.model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            # training performance
+            "training_table": self.training_table,
+            "train_losses": self.train_losses,
+            "val_losses": self.val_losses,
+            'lr_history': self.lr_history,
+            # settings and meta data
+            "loss_fn": self.loss_fn,
+            "epoch": epoch,
+            "elapsed_train_time": elapsed_time
+        }
+'''
 
 ################################################################################################################################################    
 # Initialize a HTML table for performance tracking (if running in a notebook)
-def initialize_table():
+def initialize_table() -> str:
     table_html = """
     <table id="training_table" style="width:60%; border-collapse: collapse;">
         <thead style="position: sticky; top: 0; z-index: 1;">
@@ -163,17 +393,17 @@ def initialize_table():
     return """<div id="scrollable_table" style="height: 300px; overflow-y: scroll;">""" + table_html + """</div>"""
 
 # ---------------------------------------------------
-def add_row(table, epoch, iteration, batch_loss, train_loss):
+def add_row(table: list, epoch: str, iteration: str, batch_loss: str, train_loss: str):
     table.append([epoch, iteration, batch_loss, train_loss])
 
 # Function to print the performance table
 header_printed = False
-def print_row(training_table):
+def print_row(training_table: list):
     global header_printed
     headers = ["Epoch", "Iteration", "Batch Loss", "Train Loss"]
     col_widths = [14, 14, 14, 14]  # Define fixed column widths
 
-    def format_row(row):
+    def format_row(row: list) -> list:
         return [str(item).ljust(width) for item, width in zip(row, col_widths)]
 
     if not header_printed:
