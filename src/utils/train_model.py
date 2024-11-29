@@ -1,17 +1,17 @@
 import os, time, math, torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torchrl.trainers import Trainer as TorchRLTrainer
+#from torchrl.trainers import Trainer as TorchRLTrainer
 from tqdm.notebook import tqdm as tqdm_nb
 from tqdm import tqdm as tqdm
 from IPython.display import HTML, display_html
 from tabulate import tabulate
-if torch.cuda.is_available(): from torch.cuda.amp import GradScaler, autocast
+if torch.cuda.is_available(): from torch.amp import GradScaler, autocast
 
 
 #############################################################################################################
 # -----------------------------------------------------------------------------------------------------------
-class Trainer(TorchRLTrainer):
+class Trainer():
 
     def __init__(self, model: nn.Module, optimizer: torch.optim.Optimizer, loss_fn: nn.Module, 
                  train_loader: DataLoader, num_epochs: int, device: torch.device, 
@@ -30,7 +30,7 @@ class Trainer(TorchRLTrainer):
         self.scheduler = scheduler
         self.state = state
         self.use_mixed_precision = use_mixed_precision if torch.cuda.is_available() else False
-        if self.use_mixed_precision: self.scaler = GradScaler()  # Initialize GradScaler
+        if self.use_mixed_precision: self.scaler = GradScaler('cuda')  # Initialize GradScaler
         self.clip_value = clip_value
 
     def validate_model(self, epoch: int) -> float:
@@ -100,7 +100,7 @@ class Trainer(TorchRLTrainer):
 
                     # A) use mixed precision calculation
                     if self.use_mixed_precision:
-                        with autocast():  # Enable autocast for mixed precision training
+                        with autocast(device_type='cuda'):  # Enable autocast for mixed precision training
                             outputs = self.model(inputs)
                             loss = self.loss_fn(outputs.squeeze(), targets)
                         self.scaler.scale(loss).backward()  # Scale the loss and perform backward pass
@@ -182,7 +182,7 @@ class Trainer(TorchRLTrainer):
 
 '''#############################################################################################################
 # -----------------------------------------------------------------------------------------------------------
-class Trainer_packed(TorchRLTrainer):
+class Trainer_packed():
 
     def __init__(self, model: nn.Module, optimizer: torch.optim.Optimizer, loss_fn: nn.Module, 
                  train_loader: DataLoader, num_epochs: int, device: torch.device, 
@@ -201,7 +201,7 @@ class Trainer_packed(TorchRLTrainer):
         self.scheduler = scheduler
         self.state = state
         self.use_mixed_precision = use_mixed_precision if torch.cuda.is_available() else False
-        if self.use_mixed_precision: self.scaler = GradScaler()  # Initialize GradScaler
+        if self.use_mixed_precision: self.scaler = GradScaler('cuda')  # Initialize GradScaler
         self.clip_value = clip_value
 
     def validate_model(self, epoch: int) -> float:
@@ -271,7 +271,7 @@ class Trainer_packed(TorchRLTrainer):
 
                     # A) use mixed precision calculation
                     if self.use_mixed_precision:
-                        with autocast():  # Enable autocast for mixed precision training
+                        with autocast(device_type='cuda'):  # Enable autocast for mixed precision training
                             outputs = self.model(inputs)   # inputs are packed, outputs are not ! --> see forward method in model
                             loss = self.loss_fn(outputs.squeeze(), targets)
                         self.scaler.scale(loss).backward()  # Scale the loss and perform backward pass
