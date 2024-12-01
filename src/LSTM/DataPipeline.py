@@ -40,24 +40,29 @@ CONFIG = {
     "TRAIN_VAL_TEST":   [0.8, 0.15, 0.05], # [train, val, test splits]
     "MAX_FILES":        None, # None: all files
     "SCALERS":          {'feature_scaler': 'MaxAbsScaler()', 'target_scaler': 'MinMaxScaler(feature_range=(0, 1))'},
-    "MIN_SEQ_LENGTH":   60, # minimum sequence length in seconds
+    "MIN_SEQ_LENGTH":   100, # minimum sequence length in seconds
 
     # FEATURES: -------------------------------------------------------------------
-    "FEATURES":         ["vehspd_cval_cpc", "altitude_cval_ippc", "airtempoutsd_cval_cpc", 'roadgrad_cval_pt', "vehweight_cval_pt", "accelpdlposn_cval", 
-                         "bs_brk_cval", "elcomp_pwrcons_cval","epto_pwr_cval", "motortemperature_pti1", "powerstagetemperature_pti1", 'airtempinsd_cval_hvac', 
-                         'brktempra_cval', 'selgr_rq_pt'],
+    "FEATURES":         ['airtempoutsd_cval_cpc','elcomp_pwrcons_cval','hv_batmaxchrgpwrlim_cval_1','motortemperature_pti1',
+                            'airtempinsd_cval_hvac','brktempra_cval','maxrecuppwrprc_cval','lv_convpwr_cval_dcl1','altitude_cval_ippc',
+                            'vehweight_cval_pt','epto_pwr_cval','emot_pwr_cval','hv_batmaxdischrgpwrlim_cval_1','hv_batpwr_cval_bms1',
+                            'hv_curr_cval_dcl1','airtempinsd_rq','hv_dclink_volt_cval_dcl1','accelpdlposn_cval','hv_batcurr_cval_bms1',
+                            'actualspeed_pti1','currpwr_contendrnbrkresist_cval','maxtracpwrpct_cval','hv_pwr_cval_dcl1','actualtorque_pti1',
+                            'rmsmotorcurrent_pti1','powerstagetemperature_pti1','actdrvtrnpwrprc_cval','vehspd_cval_cpc',
+                            'hv_batavcelltemp_cval_bms1','actualdcvoltage_pti1','brc_stat_brc1','roadgrad_cval_pt','hv_batisores_cval_e2e',
+                            'txoiltemp_cval_tcm','hv_bat_dc_momvolt_cval_bms1','hv_ptc_cabin1_pwr_cval','selgr_rq_pt','bs_brk_cval'],
     "TARGETS":          ['hv_bat_soc_cval_bms1'],
 
     # MODEL: -----------------------------------------------------------------------
-    "HIDDEN_SIZE":      400,    # features in the hidden state h
+    "HIDDEN_SIZE":      200,    # features in the hidden state h
     "NUM_LAYERS":       2,      # recurrent layers for stacked LSTMs. Default: 1
     "DROPOUT":          0.5,
     "SEQ_LENGTH":       60,
     
     # TRAINING & OPTIMIZER: --------------------------------------------------------
-    "NUM_EPOCHS":       100,
-    "BATCH_SIZE":       32,   # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
-    "LEARNING_RATE":    3e-3,   # 0.001 lr
+    "NUM_EPOCHS":       40,
+    "BATCH_SIZE":       64,   # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
+    "LEARNING_RATE":    5e-3,   # 0.001 lr
     "OPTIMIZER":        "torch.optim.AdamW(model.parameters(), lr = LEARNING_RATE, weight_decay = 1e-3)",      
                             # weight_decay = 1e-4     # weight decay coefficient (default: 1e-2)
                             # betas = (0.9, 0.95),    # coefficients used for computing running averages of gradient and its square (default: (0.9, 0.999))
@@ -65,7 +70,7 @@ CONFIG = {
     "LRSCHEDULER":      "torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience = 2, factor = 0.5, min_lr = 1e-7)",
 
     # LOSS FUNCTION: ---------------------------------------------------------------
-    "CRITERION":        "nn.SmoothL1Loss()", #['nn.MSELoss()', 'nn.L1Loss()', 'nn.SmoothL1Loss()', 'nn.HuberLoss()', 'MASE()']
+    "CRITERION":        "nn.MSELoss()", #['nn.MSELoss()', 'nn.L1Loss()', 'nn.SmoothL1Loss()', 'nn.HuberLoss()', 'MASE()']
 
 
     # METRICS: ---------------------------------------------------------------------
@@ -693,7 +698,7 @@ trainer = Trainer_packed(
     num_epochs = NUM_EPOCHS, 
     device = DEVICE, 
     is_notebook = IS_NOTEBOOK,
-    use_mixed_precision = True
+    use_mixed_precision = False
     )
     
 trained = trainer.train_model()
