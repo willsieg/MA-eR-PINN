@@ -2,6 +2,7 @@ import torch
 import bisect
 import random
 import pandas as pd
+import pyarrow.parquet as pq
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 
@@ -26,7 +27,7 @@ class TripDataset(Dataset):
             # Fit the scalers incrementally to avoid memory errors
             num_files = len(self.file_list)
             for i, file in enumerate(self.file_list):
-                df = pd.read_parquet(file, columns = input_columns+target_column, engine='fastparquet')
+                df = pd.read_parquet(file, columns = input_columns+target_column, engine='pyarrow')
                 X = df[input_columns].values
                 y = df[target_column].values.reshape(-1, 1)  # Reshape to match the shape of the input: 2D array with one column
                 self.scaler.partial_fit(X)
@@ -42,7 +43,7 @@ class TripDataset(Dataset):
         for i, file in enumerate(self.file_list):
             # DATA PREPROCESSING -----------------------------------------------------------
             # Assigning inputs and targets and reshaping ---------------
-            df = pd.read_parquet(file, columns = input_columns+target_column, engine='fastparquet')
+            df = pd.read_parquet(file, columns = input_columns+target_column, engine='pyarrow')
             X = df[input_columns].values
             y = df[target_column].values.reshape(-1, 1)  # Reshape 
             # use the previously fitted scalers to transform the data
