@@ -430,15 +430,16 @@ class Trainer_packed():
         print(f"{'-'*60}\nTraining Completed.\tExecution Time: {time.strftime('%H:%M:%S', time.gmtime(elapsed_time))}\n{'-'*60}\n")
         return {
             # model and optimizer states
-            "model": self.model,
             "model_state_dict": self.model.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
+
             # training performance
             "training_table": self.training_table,
             "train_losses": self.train_losses,
             "train_losses_per_iter": list(self.train_losses_per_iter),
             "val_losses": self.val_losses,
             'lr_history': self.lr_history,
+            
             # settings and meta data
             "loss_fn": self.loss_fn,
             "epoch": epoch,
