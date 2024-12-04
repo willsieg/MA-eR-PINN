@@ -1,4 +1,4 @@
-import os, time, math, torch
+import os, time, math, torch, random
 import torch.nn as nn
 from torch.utils.data import DataLoader
 #from torchrl.trainers import Trainer as TorchRLTrainer
@@ -7,8 +7,10 @@ from tqdm import tqdm as tqdm
 from IPython.display import HTML, display_html
 from tabulate import tabulate
 if torch.cuda.is_available(): from torch.amp import GradScaler, autocast
+SEED = 42; random.seed(SEED); torch.manual_seed(SEED)
 
 
+#############################################################################################################
 #############################################################################################################
 # -----------------------------------------------------------------------------------------------------------
 class Trainer():
@@ -180,13 +182,15 @@ class Trainer():
         }
 
 
-'''#############################################################################################################
+
+#############################################################################################################
+#############################################################################################################
 # -----------------------------------------------------------------------------------------------------------
 class Trainer_packed():
 
     def __init__(self, model: nn.Module, optimizer: torch.optim.Optimizer, loss_fn: nn.Module, 
                  train_loader: DataLoader, num_epochs: int, device: torch.device, 
-                 is_notebook: bool = False, val_loader: DataLoader = None, 
+                 is_notebook: bool = False, val_loader: DataLoader = None, test_loader: DataLoader = None, 
                  scheduler: torch.optim.lr_scheduler._LRScheduler = None, state: dict = None, 
                  use_mixed_precision: bool = False, clip_value = None):
 
@@ -198,36 +202,103 @@ class Trainer_packed():
         self.device = device
         self.is_notebook = is_notebook
         self.val_loader = val_loader
+        self.test_loader = test_loader
         self.scheduler = scheduler
         self.state = state
         self.use_mixed_precision = use_mixed_precision if torch.cuda.is_available() else False
         if self.use_mixed_precision: self.scaler = GradScaler('cuda')  # Initialize GradScaler
         self.clip_value = clip_value
 
+    # EVALUATION ROUTINE DEFINITION -----------------------------------------------------------------
+    def evaluate_model(self) -> tuple:
+        if self.test_loader is None: print("No test data available."); return None
+        else:
+            self.model.eval()  # Set model to evaluation mode
+            test_loss = 0.0
+            all_outputs, all_targets, all_original_lengths = [], [], []
+
+            with torch.no_grad():
+                for inputs, targets, original_lengths in self.test_loader:
+                    inputs, targets = inputs.to(self.device), targets.to(self.device)
+                    # -------------------------------------
+                    if self.use_mixed_precision:
+                        with autocast(device_type='cuda'):
+                            outputs = self.model(inputs)  # inputs are packed, outputs are not ! --> see forward method in model
+                            outputs = outputs.squeeze()
+                            if outputs.dim() > 1:
+                                mask = torch.arange(outputs.size(1))[None, :] < original_lengths[:, None]
+                            else:
+                                print("shape: ", outputs.shape), print(outputs.size(0), outputs.size(1))
+                            outputs_masked = outputs[mask]
+                            targets_masked = targets[mask]
+                            loss = self.loss_fn(outputs_masked.squeeze(), targets_masked).mean()
+                            test_loss += loss.item()
+                    else:
+                        outputs = self.model(inputs)  # inputs are packed, outputs are not ! --> see forward method in model
+                        outputs = outputs.squeeze()
+                        mask = torch.arange(outputs.size(1))[None, :] < original_lengths[:, None]
+                        outputs_masked = outputs[mask]
+                        targets_masked = targets[mask]
+                        loss = self.loss_fn(outputs_masked.squeeze(), targets_masked).mean()
+                        test_loss += loss.item()
+                    # -------------------------------------
+                    # Detach tensors from the computation graph and move them to CPU
+                    outputs = outputs.detach().cpu().numpy()
+                    targets = targets.detach().cpu().numpy()
+                    # Remove the padded endings of each sequence and restore their original lengths
+                    unpadded_outputs = [output[:length] for output, length in zip(outputs, original_lengths)]
+                    unpadded_targets = [target[:length] for target, length in zip(targets, original_lengths)]
+                    # -------------------------------------
+                    # Collect all outputs and targets
+                    all_outputs.append(unpadded_outputs)
+                    all_targets.append(unpadded_targets)
+                    all_original_lengths.append(original_lengths.detach().cpu().numpy())
+            # -------------------------------------
+            test_loss /= len(self.test_loader)  # Calculate average test loss
+            return test_loss, all_outputs, all_targets, all_original_lengths
+
+    # VALIDATION ROUTINE DEFINITION -----------------------------------------------------------------
     def validate_model(self, epoch: int) -> float:
-        self.model.eval()  # Set model to evaluation mode
-        val_loss = 0.0
-        with torch.no_grad():  # Disable gradient calculation
-            for inputs, targets in self.val_loader:
-                inputs, targets = inputs.to(self.device), targets.to(self.device)
-                outputs = self.model(inputs)
-                loss = self.loss_fn(outputs.squeeze(), targets)
-                val_loss += loss.item()
-        val_loss /= len(self.val_loader)  # Calculate average validation loss
-        if self.scheduler:
-            lr1 = self.scheduler.get_last_lr()[0]
-            self.scheduler.step(val_loss)  # Adjust learning rate based on validation loss
-            lr2 = self.scheduler.get_last_lr()[0]
-            self.lr_history.append(lr2)
-            if lr1 != lr2:
-                print(f"Learning rate updated after epoch {epoch}: {lr1} -> {lr2}")
-        return val_loss
+        if self.val_loader is None: print("No validation data available."); return None
+        else:
+            self.model.eval()  # Set model to evaluation mode
+            val_loss = 0.0
+            with torch.no_grad():  # Disable gradient calculation
+                for inputs, targets, original_lengths in self.val_loader:
+                    inputs, targets = inputs.to(self.device), targets.to(self.device)
+                    # -------------------------------------
+                    if self.use_mixed_precision:
+                        with autocast(device_type='cuda'):
+                            outputs = self.model(inputs)  # inputs are packed, outputs are not ! --> see forward method in model
+                            outputs = outputs.squeeze()
+                            mask = torch.arange(outputs.size(1))[None, :] < original_lengths[:, None]
+                            outputs = outputs[mask]
+                            targets = targets[mask]
+                            loss = self.loss_fn(outputs.squeeze(), targets).mean()
+                            val_loss += loss.item()
+                    else:
+                        outputs = self.model(inputs)  # inputs are packed, outputs are not ! --> see forward method in model
+                        outputs = outputs.squeeze()
+                        mask = torch.arange(outputs.size(1))[None, :] < original_lengths[:, None]
+                        outputs = outputs[mask]
+                        targets = targets[mask]
+                        loss = self.loss_fn(outputs.squeeze(), targets).mean()
+                        val_loss += loss.item()
+            # -------------------------------------          
+            val_loss /= len(self.val_loader)  # Calculate average validation loss
+            if self.scheduler:
+                lr1 = self.scheduler.get_last_lr()[0]
+                self.scheduler.step(val_loss)  # Adjust learning rate based on validation loss
+                lr2 = self.scheduler.get_last_lr()[0]
+                self.lr_history.append(lr2)
+                if lr1 != lr2: print(f"Learning rate updated after epoch {epoch}: {lr1} -> {lr2}")
+            return val_loss
 
     # TRAINING ROUTINE DEFINITION -----------------------------------------------------------------
     def train_model(self) -> dict:
        # output info on training process
         print(f"{'-'*60}\nTraining Started.\tProcess ID: {os.getpid()} \n{'-'*60}\n"
-              f"Model: {self.model.__class__.__name__}\t\tParameters on device: {str(next(self.model.parameters()).device).upper()}\n{'-'*60}\n"
+              f"Model: {self.model.__class__.__name__}\tParameters on device: {str(next(self.model.parameters()).device).upper()}\n{'-'*60}\n"
               f"Train/Batch size:\t{len(self.train_loader.dataset)} / {self.train_loader.batch_size}\n"
               f"Loss:\t\t\t{self.loss_fn}\nOptimizer:\t\t{self.optimizer.__class__.__name__}\nLR:\t\t\t"
               f"{self.optimizer.param_groups[0]['lr']}\nWeight Decay:\t\t{self.optimizer.param_groups[0]['weight_decay']}\n{'-'*60}")
@@ -238,12 +309,14 @@ class Trainer_packed():
             self.model.load_state_dict(self.state['model_state_dict'])
             self.optimizer.load_state_dict(self.state['optimizer_state_dict'])
             self.train_losses = self.state['train_losses']
+            self.train_losses_per_iter = self.state['train_losses_per_iter']
             self.lr_history = self.state['lr_history']
             self.val_losses = self.state['val_losses']
             self.training_table = self.state['training_table']
             start_epoch = self.state['epoch'] + 1
         else:
             self.train_losses = [] 
+            self.train_losses_per_iter = []
             self.val_losses = []  
             self.training_table = []  
             self.lr_history = []
@@ -259,9 +332,12 @@ class Trainer_packed():
 
             tqdm_version = tqdm_nb if self.is_notebook else tqdm
             with tqdm_version(enumerate(self.train_loader, 1), unit="batch", total=num_iterations, leave=False) as tepoch:
-                for iter, (inputs, targets, length) in tepoch:  # ----> note: (packed_inputs, padded_targets, lengths)
+                for iter, (inputs, targets, original_lengths) in tepoch:  # ----> note: (packed_inputs, padded_targets, lengths)
                     tepoch.set_description(f"Epoch {epoch}/{self.num_epochs}")
-
+                    #print("Dataloader: ", type(inputs), type(targets), type(original_lengths))
+                    #print(f"Shape of inputs: {inputs.data.shape}, {type(inputs)}")
+                    #print(f"Shape of targets: {targets.shape}, {type(targets)}")
+                    #print(f"Shape of original_lengths: {original_lengths.shape}, {type(original_lengths)}")
                     # -------------------------------------------------------------
                     # Move data to the GPU
                     inputs, targets = inputs.to(self.device), targets.to(self.device)
@@ -269,23 +345,39 @@ class Trainer_packed():
                     # zero gradients -> forward pass -> obtain loss function -> apply backpropagation -> update weights:
                     self.optimizer.zero_grad()
 
-                    # A) use mixed precision calculation
+                    # A) use mixed precision calculation ------------------------------------------------------------------------------
                     if self.use_mixed_precision:
                         with autocast(device_type='cuda'):  # Enable autocast for mixed precision training
                             outputs = self.model(inputs)   # inputs are packed, outputs are not ! --> see forward method in model
-                            loss = self.loss_fn(outputs.squeeze(), targets)
+                            outputs = outputs.squeeze()
+                            mask = torch.arange(outputs.size(1))[None, :] < original_lengths[:, None]
+                            outputs = outputs[mask]
+                            targets = targets[mask]
+                            loss = self.loss_fn(outputs.squeeze(), targets).mean()
                         self.scaler.scale(loss).backward()  # Scale the loss and perform backward pass
                         if self.clip_value is not None:
                             nn.utils.clip_grad_value_(self.model.parameters(), clip_value=self.clip_value)  # optional: Gradient Value Clipping
                         self.scaler.step(self.optimizer)  # Update model parameters
                         self.scaler.update()  # Update the scale for next iteration
 
-                    # B) Normal precision calculation
+                    # B) Normal precision calculation ------------------------------------------------------------------------------
                     else:
-                        print(f"Shape of inputs: {inputs.shape}")
+                        #print("Forwarding.")
                         outputs = self.model(inputs)  # inputs are packed, outputs are not ! --> see forward method in model
-                        print(f"Shape of outputs: {inputs.shape}")
-                        loss = self.loss_fn(outputs, targets)  # UPDATE: outpts.squeeze() --> outputs
+                        # -------------------------------------
+                        #print(f"Shape of outputs: {outputs.shape}, {type(outputs)}")
+                        outputs = outputs.squeeze()
+                        mask = torch.arange(outputs.size(1))[None, :] < original_lengths[:, None]
+
+                        #print(f"Shape of mask: {mask.shape}, {type(mask)}")
+                        #print(f"Masking.")
+                        outputs = outputs[mask]
+                        targets = targets[mask]
+                        # -------------------------------------
+                        #print(f"Shape of outputs after mask: {outputs.shape}, {type(outputs)}")
+                        #print(f"Shape of targets after mask: {targets.shape}, {type(targets)}")
+
+                        loss = self.loss_fn(outputs.squeeze(), targets).mean()
                         loss.backward()
                         if self.clip_value is not None:
                             nn.utils.clip_grad_value_(self.model.parameters(), clip_value=self.clip_value)  # optional: Gradient Value Clipping
@@ -308,9 +400,9 @@ class Trainer_packed():
 
                     # -------------------------------------------------------------
                     # Update running loss and progress bar
+                    self.train_losses_per_iter.append(loss.item())
                     running_loss += loss.item()  # accumulate loss for epoch
-                    tepoch.set_postfix(loss=loss.item())
-                    tepoch.update(1)
+                    tepoch.set_postfix(loss=loss.item()); tepoch.update(1)
 
             # Calculate average training loss for the epoch
             avg_train_loss = running_loss / len(self.train_loader)
@@ -330,7 +422,7 @@ class Trainer_packed():
                 # Update the performance table
                 add_row(self.training_table, f"Val", f"Validation Loss:", f"{val_loss:.6f}", "")
                 if self.is_notebook:
-                    display_html(HTML(f"""<script>addRow("<b>Val", "Validation Loss:", "<b>{val_loss:.4f}", "");</script>"""))
+                    display_html(HTML(f"""<script>addRow("<b>Val", "Validation Loss:", "<b>{val_loss:.6f}", "");</script>"""))
                 else:
                     print_row(self.training_table)
 
@@ -344,6 +436,7 @@ class Trainer_packed():
             # training performance
             "training_table": self.training_table,
             "train_losses": self.train_losses,
+            "train_losses_per_iter": list(self.train_losses_per_iter),
             "val_losses": self.val_losses,
             'lr_history': self.lr_history,
             # settings and meta data
@@ -351,9 +444,10 @@ class Trainer_packed():
             "epoch": epoch,
             "elapsed_train_time": elapsed_time
         }
-'''
 
-################################################################################################################################################    
+
+#############################################################################################################
+#############################################################################################################
 # Initialize a HTML table for performance tracking (if running in a notebook)
 def initialize_table() -> str:
     table_html = """
@@ -392,10 +486,12 @@ def initialize_table() -> str:
     """
     return """<div id="scrollable_table" style="height: 300px; overflow-y: scroll;">""" + table_html + """</div>"""
 
+##########################################################
 # ---------------------------------------------------
 def add_row(table: list, epoch: str, iteration: str, batch_loss: str, train_loss: str):
     table.append([epoch, iteration, batch_loss, train_loss])
 
+##########################################################
 # Function to print the performance table
 header_printed = False
 def print_row(training_table: list):
