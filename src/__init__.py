@@ -28,7 +28,7 @@ from pytorch_forecasting.metrics import MASE
 
 # SETUP ------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
-def setup_environment(CONFIG, ROOT, SEED):
+def setup_environment(CONFIG, ROOT, SEED, GPU_SELECT):
     global DATA_PATH, IS_NOTEBOOK, DEVICE
 
     import sys, os

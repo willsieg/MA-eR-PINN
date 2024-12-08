@@ -1,8 +1,14 @@
-
 import os
 import torch
 import pickle
 from datetime import datetime
+from pathlib import Path
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.signal import savgol_filter
+from sklearn.metrics import mean_squared_error
+
 
 def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, config, subset_files, pth_folder):
 
@@ -23,25 +29,25 @@ def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, 
     print(f"Model saved to:\t {model_destination_path}\n{'-'*60}\nSize: {os.path.getsize(model_destination_path) / 1024**2:.2f} MB\n{'-'*60}")
     if os.path.getsize(model_destination_path) > 100 * 1024**2: 
         print("--> Warning: saved model size exceeds 100MB! Creating a zip file instead ...")
-    try:
-        import io, zipfile
-        buffer = io.BytesIO()
-        torch.save(checkpoint, buffer)
-        buffer.seek(0)
-        model_destination_path_zip = Path(pth_folder, model_name_id + ".zip")
-        with zipfile.ZipFile(model_destination_path_zip, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zipf: 
-            zipf.writestr(model_destination_path_zip.name, buffer.read())
-            if os.path.getsize(model_destination_path_zip) > 100 * 1024**2:
-                print("--> Warning: zip compressed model size still exceeds 100MB!")
-            print(f"Model saved to:\t {model_destination_path_zip}\n{'-'*60}\nSize: {os.path.getsize(model_destination_path_zip) / 1024**2:.2f} MB\n{'-'*60}")
-    except Exception as e:
-        print(f"An error occurred while trying to save the model as a zip file: {e}")
+        try:
+            import io, zipfile
+            buffer = io.BytesIO()
+            torch.save(checkpoint, buffer)
+            buffer.seek(0)
+            model_destination_path_zip = Path(pth_folder, model_name_id + ".zip")
+            with zipfile.ZipFile(model_destination_path_zip, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zipf: 
+                zipf.writestr(model_destination_path_zip.name, buffer.read())
+                if os.path.getsize(model_destination_path_zip) > 100 * 1024**2:
+                    print("--> Warning: zip compressed model size still exceeds 100MB!")
+                print(f"Model saved to:\t {model_destination_path_zip}\n{'-'*60}\nSize: {os.path.getsize(model_destination_path_zip) / 1024**2:.2f} MB\n{'-'*60}")
+        except Exception as e:
+            print(f"An error occurred while trying to save the model as a zip file: {e}")
 
     return checkpoint, model_destination_path
 
 
 
-def load_checkpoint(model_destination_path, model, optimizer, DEVICE, GPU_SELECT):
+def load_checkpoint(model_destination_path, model, optimizer, train_loader, DEVICE, GPU_SELECT):
     try: 
         checkpoint = torch.load(model_destination_path, weights_only=False, \
             map_location=DEVICE if (torch.cuda.is_available() and GPU_SELECT is not None) else torch.device('cpu'))
