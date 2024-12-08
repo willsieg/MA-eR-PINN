@@ -67,7 +67,7 @@ def load_checkpoint(model_destination_path, model, optimizer, DEVICE, GPU_SELECT
 
     return model, optimizer, checkpoint
 
-    
+
 
 def plot_training_performance(training_df, train_losses_per_iter, train_losses, val_losses, lr_history, train_batches):
     NUM_EPOCHS = CONFIG['NUM_EPOCHS']
@@ -94,3 +94,23 @@ def plot_training_performance(training_df, train_losses_per_iter, train_losses, 
         ax2.set_ylabel('Learning Rate', color='green')
         ax2.tick_params(axis='y', labelcolor='green')
         ax2.set_yscale('log')
+
+# PLOT PREDICTION -----------------------------------------------------------------
+def plot_prediction(y_true, y_pred, plot_active=True):
+     if plot_active:
+          plt.figure(figsize=(18,4))
+          plt.xlabel('Time in s')
+          plt.ylabel('SOC in %')
+          plt.title('Battery State of Charge: Prediction vs. Actual Data')
+          plt.plot(y_true, label='Actual Data')  # actual plot
+          plt.plot(np.arange(0, len(y_true), 1), y_pred, label='Predicted Data')  # predicted plot
+          plt.legend()
+          plt.text(0.01, 0.02, f"RMSE: {root_mean_squared_error(y_true, y_pred):.4f}\nStd Dev: {np.std(y_true - y_pred):.4f}",
+          transform=plt.gca().transAxes, fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
+
+          plt.figure(figsize=(18,4))
+          plt.xlabel('Time in s')
+          plt.ylabel('SOC in %')
+          plt.plot(savgol_filter(y_true.flatten(), window_length=60, polyorder=3), label='Actual Data (Smoothed)')  # actual plot
+          plt.plot(np.arange(0, len(y_true), 1), savgol_filter(y_pred.flatten(), window_length=60, polyorder=3), label='Predicted Data (Smoothed)')  # predicted plot
+          plt.legend()
