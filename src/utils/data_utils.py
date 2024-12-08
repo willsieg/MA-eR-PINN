@@ -109,6 +109,7 @@ def create_batches(dataset: Dataset, batch_size: int, shuffle_batches: bool = Tr
         random.shuffle(batches)
 
     # Ensure the shortest batch is placed at the end 
+    batch_sizes = [len(batch) for batch in batches]
     # This is important in order to keep hidden/cell states of the LSTM across all batches
     shortest_batch = min(batches, key=len)
     batches.remove(shortest_batch)
@@ -119,7 +120,6 @@ def create_batches(dataset: Dataset, batch_size: int, shuffle_batches: bool = Tr
     
     '''
     # Discard batches with size 1 to avoid errors in the collate_fn
-    batch_sizes = [len(batch) for batch in batches]
     if any(size == 1 for size in batch_sizes):
         batches = [batch for batch in batches if len(batch) > 1]
         print(f"\t --> Warning: Discarded {len(batch_sizes) - len(batches)} more batches with size 1")
@@ -129,8 +129,7 @@ def create_batches(dataset: Dataset, batch_size: int, shuffle_batches: bool = Tr
     print(f"\tNumber of batches created: {len(batches)}")
 
     # Print the sizes of the batches
-    batch_sizes = [len(batch) for batch in batches]
-    print(f"\t\tBatch sizes: {batch_sizes}")
+    #print(f"\t\tBatch sizes: {batch_sizes}")
     
     return BatchDataset(batches)
 
@@ -177,6 +176,24 @@ def collate_fn(batch, shuffle_in_batch: bool = False, padding_value: int = 0) ->
         enforce_sorted = not shuffle_in_batch)
 
     return packed_inputs, padded_targets, lengths
+
+
+# BATCH LOADER CHECK -----------------------------------------------------------------------
+def check_batch(train_loader):
+    # Iterate through the train_loader once and print a batch example of a PackedSequence
+    for batch_idx, (packed_inputs, padded_targets, lengths) in enumerate(train_loader):
+        print(f"Batch {batch_idx}")
+        print(f"Shape of packed_inputs.data: {packed_inputs.data.shape}")
+        print(f"Lengths: {lengths}")
+        # check correct types and shapes
+        assert type(packed_inputs) == torch.nn.utils.rnn.PackedSequence
+        assert type(packed_inputs.data) == torch.Tensor
+        assert type(packed_inputs.batch_sizes) == torch.Tensor
+        assert type(padded_targets) == torch.Tensor
+        assert type(lengths) == torch.Tensor
+        assert len(packed_inputs.batch_sizes) == max(lengths)
+        assert sum(lengths) == packed_inputs.data.shape[0]
+        break
 
 
 ###################################################################################################################################
@@ -296,6 +313,15 @@ def plot_padded_sequences(batch_size, trip_lengths, descr) -> float:
         ax.legend(handles, labels, loc="upper right"); ax.grid(False); plt.show();
 
         return ratio
+
+# SEQUENCE PADDING: VISUALIZATION -------------------------------------------
+def visualize_padding(BATCH_SIZE, trip_lengths, sorted_trip_lengths, train_loader, val_loader, test_loader):
+    # compare padding proportions for unsorted and sorted sequences, as well as for the train, val, and test sets
+    _ = plot_padded_sequences(BATCH_SIZE, trip_lengths, "padding values (unsorted)")
+    _ = plot_padded_sequences(BATCH_SIZE, sorted_trip_lengths, "padding values (sorted)")
+    _ = plot_padded_sequences(BATCH_SIZE, get_trip_lengths_from_loader(train_loader), "padding values (Train Set)")
+    _ = plot_padded_sequences(BATCH_SIZE, get_trip_lengths_from_loader(val_loader), "padding values (Val Set)")
+    _ = plot_padded_sequences(BATCH_SIZE, get_trip_lengths_from_loader(test_loader), "padding values (Test Set)")
 
 
 # GET SEQUENCE LENGTHS FROM BATCH_DATALOADER OBJECT (for plotting only)  ---------------------------------------------------------------------
