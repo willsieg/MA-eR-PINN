@@ -105,19 +105,32 @@ def create_batches(dataset: Dataset, batch_size: int, shuffle_batches: bool = Tr
         batches.append(batch)
 
     # Shuffle the order of batches
-    if shuffle_batches: random.shuffle(batches)
+    if shuffle_batches:
+        random.shuffle(batches)
 
+    # Ensure the shortest batch is placed at the end 
+    # This is important in order to keep hidden/cell states of the LSTM across all batches
+    shortest_batch = min(batches, key=len)
+    batches.remove(shortest_batch)
+    if len(shortest_batch) > 1: 
+        batches.append(shortest_batch)
+    else:
+        print(f"\t --> Warning: Removed the shortest batch with size 1")
+    
+    '''
     # Discard batches with size 1 to avoid errors in the collate_fn
     batch_sizes = [len(batch) for batch in batches]
     if any(size == 1 for size in batch_sizes):
         batches = [batch for batch in batches if len(batch) > 1]
-        print(f"\t --> Warning: Discarded {len(batch_sizes) - len(batches)} batches with size 1")
+        print(f"\t --> Warning: Discarded {len(batch_sizes) - len(batches)} more batches with size 1")
+    '''
 
     # Print the number of batches created
     print(f"\tNumber of batches created: {len(batches)}")
 
     # Print the sizes of the batches
-    #print(f"\t\tBatch sizes: {batch_sizes}")
+    batch_sizes = [len(batch) for batch in batches]
+    print(f"\t\tBatch sizes: {batch_sizes}")
     
     return BatchDataset(batches)
 
@@ -172,7 +185,8 @@ def collate_fn(batch, shuffle_in_batch: bool = False, padding_value: int = 0) ->
 
 
 # GENERATE DATALOADERS  ---------------------------------------------------------------------------------------
-def prepare_dataloader(subset, indices_by_length, batch_size, input_columns, target_column, scaler, target_scaler, dataloader_settings, fit=False) -> tuple:
+def prepare_dataloader(subset, indices_by_length, batch_size, input_columns, target_column, scaler, target_scaler, \
+    dataloader_settings, fit=False, drop_last = False) -> tuple:
     """
     Prepares a DataLoader for the given dataset subset.
 
@@ -193,8 +207,8 @@ def prepare_dataloader(subset, indices_by_length, batch_size, input_columns, tar
     DESCRIPTION ----------------------------------------------------------------
     Notes: for each of the three subsets, the following steps are performed:
     1. Sort each subset by descending sequence lengths based on the obtained indices
-    2. Check if the number of samples leaves a remainder of exactly one, leading to a (last) batch containing only one sample. 
-        In order to avoid later issues with tensor dimensions, this last (and therefore shortest sample) will be removed.
+    2. Check if the number of samples leaves a remainder, leading to a (last) batch containing fewer samples. 
+        In order to avoid later issues with tensor dimensions, this last (and therefore shortest batch) will be removed.
     3. Create a (custom) TripDataset object to select the input and target columns and apply the scalers. In case
          of the training subset, the scalers will be fitted to the training set first.
     4. Create a (custom) BatchDataset object of the corresponding TripDataset to handle the sequence padding before using 
@@ -220,8 +234,12 @@ def prepare_dataloader(subset, indices_by_length, batch_size, input_columns, tar
 
 
     subset.indices = [i for i in indices_by_length if i in set(list(subset.indices))]
-    if len(subset) % batch_size == 1:
-        subset.indices = subset.indices[:-1]
+
+    remainder = len(subset) % batch_size
+    if remainder != 0 and drop_last == True:
+        subset.indices = subset.indices[:-(remainder)]
+        print(f" --> Warning: Removed the last {remainder} samples to ensure a balanced batch size")
+
     dataset = TripDataset(subset, input_columns, target_column, scaler, target_scaler, fit=fit)
     
     
