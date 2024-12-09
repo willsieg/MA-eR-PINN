@@ -7,7 +7,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, root_mean_squared_error
+
 
 
 def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, config, subset_files, pth_folder):
