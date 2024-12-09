@@ -63,7 +63,7 @@ def load_checkpoint(model_destination_path, DEVICE):
     return checkpoint
 
 
-
+# PLOT TRAINING PERFORMANCE ------------------------------------------------------
 def plot_training_performance(training_df, train_losses_per_iter, train_losses, val_losses, lr_history, train_batches, num_epochs):
     # plot training performance:
     fig, ax1 = plt.subplots(figsize=(14,4))
@@ -110,6 +110,7 @@ def plot_prediction(y_true, y_pred, plot_active=True):
           plt.legend()
 
 
+# RESHAPE EVALUATION OUTPUTS ------------------------------------------------------
 def concat_outputs_targets(outputs, targets, original_lengths):
     all_outputs, all_targets, all_original_lengths = [], [], []
     for batch_outputs, batch_targets, batch_lengths in zip(outputs, targets, original_lengths):
