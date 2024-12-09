@@ -47,10 +47,10 @@ def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, 
 
 
 
-def load_checkpoint(model_destination_path, model, optimizer, train_loader, DEVICE, GPU_SELECT):
+def load_checkpoint(model_destination_path, DEVICE):
     try: 
         checkpoint = torch.load(model_destination_path, weights_only=False, \
-            map_location=DEVICE if (torch.cuda.is_available() and GPU_SELECT is not None) else torch.device('cpu'))
+            map_location=DEVICE if (torch.cuda.is_available()) else torch.device('cpu'))
     except NotImplementedError:
         import pathlib
         temp = pathlib.PosixPath
@@ -59,33 +59,20 @@ def load_checkpoint(model_destination_path, model, optimizer, train_loader, DEVI
         checkpoint = torch.load(model_destination_path, weights_only=False, map_location=DEVICE if torch.cuda.is_available() else torch.device('cpu'))
         pathlib.PosixPath = temp
 
-    for key in checkpoint.keys(): globals()[key] = checkpoint[key]
-
-    # configure model and optimizer:
-    model.load_state_dict(model_state_dict)
-    optimizer.load_state_dict(optimizer_state_dict)
-
-    model.eval()  # set model to evaluation mode for inference
-    print(f"Model loaded from:\t{model_destination_path}\n{'-'*60}\nModel: {model.__class__.__name__}\tParameters on device: {next(model.parameters()).device}"
-            f"\n{'-'*60}\nTrain/Batch size:\t{len(train_loader.dataset)} / {train_loader.batch_size}\n"
-            f"Loss:\t\t\t{loss_fn}\nOptimizer:\t\t{optimizer.__class__.__name__}\nLR:\t\t\t"
-            f"{optimizer.param_groups[0]['lr']}\nWeight Decay:\t\t{optimizer.param_groups[0]['weight_decay']}\n{'-'*60}\n", model)
-
-    return model, optimizer, checkpoint
+    return checkpoint
 
 
 
-def plot_training_performance(training_df, train_losses_per_iter, train_losses, val_losses, lr_history, train_batches):
-    NUM_EPOCHS = CONFIG['NUM_EPOCHS']
+def plot_training_performance(training_df, train_losses_per_iter, train_losses, val_losses, lr_history, train_batches, num_epochs):
     # plot training performance:
     fig, ax1 = plt.subplots(figsize=(14,4))
     ax1.set_xlabel('Epochs')
-    ax1.set_xticks(range(1, NUM_EPOCHS + 1))
+    ax1.set_xticks(range(1, num_epochs + 1))
 
-    assert len(train_losses_per_iter) == NUM_EPOCHS * train_batches, "Length of train_losses_per_iter might not match the number of iterations."
-    ax1.plot(np.linspace(1, NUM_EPOCHS, len(train_losses_per_iter)), train_losses_per_iter, label='batch_loss', color='lightblue')
-    ax1.plot(range(1, NUM_EPOCHS + 1), train_losses, label='train_loss', color='blue')
-    ax1.plot(range(1, NUM_EPOCHS + 1), val_losses, label='val_loss', color='red')
+    assert len(train_losses_per_iter) == num_epochs * train_batches, "Length of train_losses_per_iter might not match the number of iterations."
+    ax1.plot(np.linspace(1, num_epochs, len(train_losses_per_iter)), train_losses_per_iter, label='batch_loss', color='lightblue')
+    ax1.plot(range(1, num_epochs + 1), train_losses, label='train_loss', color='blue')
+    ax1.plot(range(1, num_epochs + 1), val_losses, label='val_loss', color='red')
 
     ax1.set_yscale('log')
     fig.tight_layout()
@@ -96,7 +83,7 @@ def plot_training_performance(training_df, train_losses_per_iter, train_losses, 
 
     if pd.Series(lr_history).nunique() > 1:
         ax2 = ax1.twinx()
-        ax2.plot(range(1, NUM_EPOCHS + 1), lr_history, label='lr', color='green', linestyle='--')
+        ax2.plot(range(1, num_epochs + 1), lr_history, label='lr', color='green', linestyle='--')
         ax2.set_ylabel('Learning Rate', color='green')
         ax2.tick_params(axis='y', labelcolor='green')
         ax2.set_yscale('log')
@@ -120,3 +107,12 @@ def plot_prediction(y_true, y_pred, plot_active=True):
           plt.plot(savgol_filter(y_true.flatten(), window_length=60, polyorder=3), label='Actual Data (Smoothed)')  # actual plot
           plt.plot(np.arange(0, len(y_true), 1), savgol_filter(y_pred.flatten(), window_length=60, polyorder=3), label='Predicted Data (Smoothed)')  # predicted plot
           plt.legend()
+
+
+def concat_outputs_targets(outputs, targets, original_lengths):
+    all_outputs, all_targets, all_original_lengths = [], [], []
+    for batch_outputs, batch_targets, batch_lengths in zip(outputs, targets, original_lengths):
+        all_outputs.extend(batch_outputs)
+        all_targets.extend(batch_targets)
+        all_original_lengths.extend(batch_lengths)
+        return all_outputs, all_targets, all_original_lengths
