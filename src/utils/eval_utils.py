@@ -11,7 +11,7 @@ from sklearn.metrics import mean_squared_error, root_mean_squared_error
 
 
 
-def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, config, subset_files, pth_folder):
+def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, config, subset_files, pth_folder) -> tuple:
 
     # Collecting results and meta data for saving dict
     trainer_add_info = {key: getattr(trainer, key) for key in ['model', 'optimizer', 'scheduler', 'state', 'clip_value', 'device', 'use_mixed_precision']}
@@ -47,8 +47,7 @@ def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, 
     return checkpoint, model_destination_path
 
 
-
-def load_checkpoint(model_destination_path, DEVICE):
+def load_checkpoint(model_destination_path, DEVICE) -> dict:
     try: 
         checkpoint = torch.load(model_destination_path, weights_only=False, \
             map_location=DEVICE if (torch.cuda.is_available()) else torch.device('cpu'))
@@ -111,10 +110,20 @@ def plot_prediction(y_true, y_pred, plot_active=True):
 
 
 # RESHAPE EVALUATION OUTPUTS ------------------------------------------------------
-def concat_outputs_targets(outputs, targets, original_lengths):
+def concat_outputs_targets(outputs, targets, original_lengths) -> tuple:
     all_outputs, all_targets, all_original_lengths = [], [], []
     for batch_outputs, batch_targets, batch_lengths in zip(outputs, targets, original_lengths):
         all_outputs.extend(batch_outputs)
         all_targets.extend(batch_targets)
         all_original_lengths.extend(batch_lengths)
         return all_outputs, all_targets, all_original_lengths
+
+
+def concat_outputs_targets_priors(outputs, targets, priors, original_lengths) -> tuple:
+    all_outputs, all_targets, all_priors, all_original_lengths = [], [], [], []
+    for batch_outputs, batch_targets, batch_priors, batch_lengths in zip(outputs, targets, priors, original_lengths):
+        all_outputs.extend(batch_outputs)
+        all_targets.extend(batch_targets)
+        all_priors.extend(batch_priors)
+        all_original_lengths.extend(batch_lengths)
+        return all_outputs, all_targets, all_priors, all_original_lengths

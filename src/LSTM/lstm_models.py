@@ -10,6 +10,7 @@ def print_info(model):
         print(f"{param_tensor}:\t {model.state_dict()[param_tensor].size()}") 
     # --> Note torch.Size([4*hidden_size, input_size]) for LSTM weights because of i,o,f,g params concatenated
 
+
 ####################################################################################################
 class LSTM1(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, dropout, device):
@@ -19,10 +20,6 @@ class LSTM1(nn.Module):
         self.hidden_size = hidden_size  # hidden state
         self.num_layers = num_layers    # number of layers
         self.dropout = dropout
-
-        # LAYERS -----------------------------------
-        self.relu = nn.ReLU()
-        self.fc_test = nn.Linear(hidden_size, 1)
 
         # LSTM CELL --------------------------------
         self.lstm = nn.LSTM(
@@ -35,6 +32,10 @@ class LSTM1(nn.Module):
             bidirectional=False,        # If True, becomes a bidirectional LSTM. Default: False
             proj_size=0,                # If > 0, will use LSTM with projections of corresponding size. Default: 0
             device=device)
+
+        # LAYERS -----------------------------------
+        self.relu = nn.ReLU()
+        self.fc_test = nn.Linear(hidden_size, 1)
 
     def forward(self, packed_input, batch_size=None):
         # Propagate input through LSTM

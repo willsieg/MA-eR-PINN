@@ -65,7 +65,7 @@ class TripDataset(Dataset):
 
     def __len__(self): return self.length
 
-    def __getitem__(self, index):
+    def __getitem__(self, index) -> tuple:
         # Check if the index is within the valid range
         if index < 0 or index >= self.length:
             raise IndexError("Index out of range")
@@ -77,6 +77,84 @@ class TripDataset(Dataset):
         return (
             self.data[file_idx][index].unsqueeze(0),  # Add time dimension
             self.targets[file_idx][index]
+        )
+
+class TripDataset_PINN(Dataset):
+    def __init__(self, file_list: list, input_columns: list, target_column: str, prior_column: str, scaler, target_scaler, prior_scaler, fit: bool = False):
+        self.file_list = file_list
+
+        self.input_columns = input_columns
+        self.target_column = target_column
+        self.prior_column = prior_column
+
+        self.scaler = scaler
+        self.target_scaler = target_scaler
+        self.prior_scaler = prior_scaler
+        self.fit = fit
+        self.data = []
+        self.targets = []
+        self.priors = []
+        self.cumulative_lengths = []
+
+        # fitting scalers over complete training dataset
+        if self.fit:
+            print(f"fitting Scalers: {scaler.__class__.__name__}, {target_scaler.__class__.__name__}, {prior_scaler.__class__.__name__}")
+            # Initialize and Fit the scalers on the complete training data set
+            # Fit the scalers incrementally to avoid memory errors
+            num_files = len(self.file_list)
+            for i, file in enumerate(self.file_list):
+                df = pd.read_parquet(file, columns = input_columns+target_column+prior_column, engine='pyarrow')
+                X = df[input_columns].values
+                y = df[target_column].values.reshape(-1, 1)  # Reshape to match the shape of the input: 2D array with one column
+                p = df[prior_column].values.reshape(-1, 1)
+                self.scaler.partial_fit(X)
+                self.target_scaler.partial_fit(y)
+                self.prior_scaler.partial_fit(p)
+            
+                # Print status info at 50%
+                if i == num_files // 2: print(f"\t50% of the fitting done...")
+                
+            print(f"Done. Create DataSets and DataLoaders...")
+
+        # transform with fitted scalers
+        cumulative_length = 0
+        for i, file in enumerate(self.file_list):
+            # DATA PREPROCESSING -----------------------------------------------------------
+            # Assigning inputs and targets and reshaping ---------------
+            df = pd.read_parquet(file, columns = input_columns+target_column+prior_column, engine='pyarrow')
+            X = df[input_columns].values
+            y = df[target_column].values.reshape(-1, 1)  # Reshape 
+            p = df[prior_column].values.reshape(-1, 1)
+            # use the previously fitted scalers to transform the data
+
+            X = self.scaler.transform(X)  
+            y = self.target_scaler.transform(y).squeeze()  # is .squeeze() necessary here?
+            p = self.prior_scaler.transform(p).squeeze()
+
+            # Append to data
+            self.data.append(torch.tensor(X, dtype=torch.float32))
+            self.targets.append(torch.tensor(y, dtype=torch.float32))
+            self.priors.append(torch.tensor(p, dtype=torch.float32))
+            cumulative_length += len(y)
+            self.cumulative_lengths.append(cumulative_length)
+
+        self.length = cumulative_length
+
+    def __len__(self): return self.length
+
+    def __getitem__(self, index) -> tuple:
+        # Check if the index is within the valid range
+        if index < 0 or index >= self.length:
+            raise IndexError("Index out of range")
+        
+        # Use binary search to find the correct file and index
+        file_idx = bisect.bisect_right(self.cumulative_lengths, index)
+        if file_idx > 0:
+            index -= self.cumulative_lengths[file_idx - 1]
+        return (
+            self.data[file_idx][index].unsqueeze(0),  # Add time dimension
+            self.targets[file_idx][index],
+            self.priors[file_idx][index]
         )
 
 
@@ -134,6 +212,46 @@ def create_batches(dataset: Dataset, batch_size: int, shuffle_batches: bool = Tr
     return BatchDataset(batches)
 
 
+def create_batches_PINN(dataset: Dataset, batch_size: int, shuffle_batches: bool = True) -> BatchDataset:
+    # Create a list to store the batches
+    batches = []
+
+    # Iterate through the sorted dataset in chunks of batch_size
+    for i in range(0, len(dataset.targets), batch_size):
+        batch = [(dataset.data[j], dataset.targets[j], dataset.priors[j]) for j in range(i, min(i + batch_size, len(dataset.targets)))]
+        batches.append(batch)
+
+    # Shuffle the order of batches
+    if shuffle_batches:
+        random.shuffle(batches)
+
+    # Ensure the shortest batch is placed at the end 
+    batch_sizes = [len(batch) for batch in batches]
+    # This is important in order to keep hidden/cell states of the LSTM across all batches
+    shortest_batch = min(batches, key=len)
+    batches.remove(shortest_batch)
+    if len(shortest_batch) > 1: 
+        batches.append(shortest_batch)
+    else:
+        print(f"\t --> Warning: Removed the shortest batch with size 1")
+    
+    '''
+    # Discard batches with size 1 to avoid errors in the collate_fn
+    if any(size == 1 for size in batch_sizes):
+        batches = [batch for batch in batches if len(batch) > 1]
+        print(f"\t --> Warning: Discarded {len(batch_sizes) - len(batches)} more batches with size 1")
+    '''
+
+    # Print the number of batches created
+    print(f"\tNumber of batches created: {len(batches)}")
+
+    # Print the sizes of the batches
+    #print(f"\t\tBatch sizes: {batch_sizes}")
+    
+    return BatchDataset(batches)
+
+
+
 # -----------------------------------------------------------------------------------------------------------
 def collate_fn(batch, shuffle_in_batch: bool = False, padding_value: int = 0) -> tuple:
     """
@@ -178,6 +296,54 @@ def collate_fn(batch, shuffle_in_batch: bool = False, padding_value: int = 0) ->
     return packed_inputs, padded_targets, lengths
 
 
+def collate_fn_PINN(batch, shuffle_in_batch: bool = False, padding_value: int = 0) -> tuple:
+    """
+    Custom collate function to process and pad sequences in a batch.
+    Args:
+        batch (list of tuples): A list of tuples where each tuple contains two elements:
+            - inputs (torch.Tensor): The input sequence tensor.
+            - targets (torch.Tensor): The target sequence tensor.
+            - priors (torch.Tensor): The prior sequence tensor.
+    Returns:
+        tuple: A tuple containing:
+            - packed_inputs (torch.nn.utils.rnn.PackedSequence): The packed input sequences.
+            - padded_targets (torch.Tensor): The padded target sequences.
+            - padded_priors (torch.Tensor): The padded prior sequences.
+            - lengths (list of int): The original lengths of the input sequences.
+    """
+
+    # If batch is a list of several batches, unwrap and concatenate them
+    if all(isinstance(b, list) for b in batch):
+        batch = [item for sublist in batch for item in sublist]
+        #print(f"batches unwrapped: {len(batch)}")
+
+    # Check if each element of batch is a tuple containing two elements
+    for n, element in enumerate(batch):
+        if not isinstance(element, tuple) or len(element) != 3:
+            raise ValueError("Each element of batch should be a tuple containing two elements")
+
+    inputs, targets, priors = zip(*batch)
+    lengths = torch.tensor([len(seq) for seq in inputs])
+    padded_inputs = pad_sequence(inputs, batch_first=True, padding_value=padding_value)
+    padded_targets = pad_sequence(targets, batch_first=True, padding_value=padding_value)
+    padded_priors = pad_sequence(priors, batch_first=True, padding_value=padding_value)
+
+    # Shuffle the inputs, targets, and lengths inside the batch
+    if shuffle_in_batch:
+        indices = torch.randperm(padded_inputs.size(0))
+        padded_inputs = padded_inputs[indices]
+        padded_targets = padded_targets[indices]
+        padded_priors = padded_priors[indices]
+        lengths = lengths[indices].tolist()
+
+    # Pack the padded input sequences
+    packed_inputs = pack_padded_sequence(padded_inputs, lengths, batch_first=True, \
+        enforce_sorted = not shuffle_in_batch)
+
+    return packed_inputs, padded_targets, padded_priors, lengths
+
+
+
 # BATCH LOADER CHECK -----------------------------------------------------------------------
 def check_batch(train_loader):
     # Iterate through the train_loader once and print a batch example of a PackedSequence
@@ -190,6 +356,23 @@ def check_batch(train_loader):
         assert type(packed_inputs.data) == torch.Tensor
         assert type(packed_inputs.batch_sizes) == torch.Tensor
         assert type(padded_targets) == torch.Tensor
+        assert type(lengths) == torch.Tensor
+        assert len(packed_inputs.batch_sizes) == max(lengths)
+        assert sum(lengths) == packed_inputs.data.shape[0]
+        break
+
+def check_batch_PINN(train_loader):
+    # Iterate through the train_loader once and print a batch example of a PackedSequence
+    for batch_idx, (packed_inputs, padded_targets, padded_priors, lengths) in enumerate(train_loader):
+        print(f"Batch {batch_idx}")
+        print(f"Shape of packed_inputs.data: {packed_inputs.data.shape}")
+        print(f"Lengths: {lengths}")
+        # check correct types and shapes
+        assert type(packed_inputs) == torch.nn.utils.rnn.PackedSequence
+        assert type(packed_inputs.data) == torch.Tensor
+        assert type(packed_inputs.batch_sizes) == torch.Tensor
+        assert type(padded_targets) == torch.Tensor
+        assert type(padded_priors) == torch.Tensor
         assert type(lengths) == torch.Tensor
         assert len(packed_inputs.batch_sizes) == max(lengths)
         assert sum(lengths) == packed_inputs.data.shape[0]
@@ -263,6 +446,65 @@ def prepare_dataloader(subset, indices_by_length, batch_size, input_columns, tar
     dataset_batches = create_batches(dataset, batch_size)
     loader = DataLoader(dataset_batches, **dataloader_settings)
     return subset, dataset, dataset_batches, loader
+
+
+def prepare_dataloader_PINN(subset, indices_by_length, batch_size, input_columns, target_column, prior_column, scaler, \
+    target_scaler, prior_scaler, dataloader_settings, fit=False, drop_last = False) -> tuple:
+    """
+    Prepares a DataLoader for the given dataset subset.
+
+    Args:
+        subset (Dataset): The dataset subset to be used.
+        indices_by_length (list): List of indices sorted by sequence length.
+        batch_size (int): The size of each batch.
+        input_columns (list): List of column names to be used as input features.
+        target_column (str): The column name to be used as the target variable.
+        prior_column (str): The column name to be used as the prior variable.
+        scaler (object): Scaler object for normalizing input features.
+        target_scaler (object): Scaler object for normalizing target variable.
+        prior_scaler (object): Scaler object for normalizing prior variable.
+        dataloader_settings (dict): Additional settings for the DataLoader.
+        fit (bool, optional): Whether to fit the scalers on the dataset. Defaults to False.
+
+    Returns:
+        tuple: A tuple containing the dataset, dataset batches, and DataLoader.
+
+    DESCRIPTION ----------------------------------------------------------------
+    Notes: for each of the three subsets, the following steps are performed:
+    1. Sort each subset by descending sequence lengths based on the obtained indices
+    2. Check if the number of samples leaves a remainder, leading to a (last) batch containing fewer samples. 
+        In order to avoid later issues with tensor dimensions, this last (and therefore shortest batch) will be removed.
+    3. Create a (custom) TripDataset_PINN object to select the input, target and prior columns and apply the scalers. In case
+         of the training subset, the scalers will be fitted to the training set first.
+    4. Create a (custom) BatchDataset object of the corresponding TripDataset_PINN to handle the sequence padding before using 
+            the DataLoader to create the batches.
+    5. The DataLoader will then be used to iterate over the batches during training. To use the integrated collate_fn_PINN function
+            of the DataLoader, the batch_size has to be set to 1. The actual batch size is then handled by the BatchDataset object.
+    6. The collate_fn_PINN that is integrated in the DataLoader will automatically handle the shuffling, padding and packing
+            of the sequences. The DataLoader will return a tuple of (packed_inputs, padded_targets, padded_priors, lengths), where
+            the packed_inputs are PackedSequence objects that can be efficiently processed by RNNs.
+            [Output tuple of types (<class 'torch.nn.utils.rnn.PackedSequence'>, <class 'torch.Tensor'>, <class 'torch.Tensor'>)]
+
+    Note: shuffling will be done batchwise, however inside each batch the sequences will remain sorted by length
+
+    *Note: Because of the BatchDataset object in the train loader, "batch_size" refers to the number of batches to feed, not the 
+    number of samples in a batch. Also, the "drop_last" argument is useless due to this.
+    """
+
+    subset.indices = [i for i in indices_by_length if i in set(list(subset.indices))]
+
+    remainder = len(subset) % batch_size
+    if remainder != 0 and drop_last == True:
+        subset.indices = subset.indices[:-(remainder)]
+        print(f" --> Warning: Removed the last {remainder} samples to ensure a balanced batch size")
+
+    dataset = TripDataset_PINN(subset, input_columns, target_column, prior_column, scaler, target_scaler, prior_scaler, fit=fit)
+    
+    
+    dataset_batches = create_batches_PINN(dataset, batch_size)
+    loader = DataLoader(dataset_batches, **dataloader_settings)
+    return subset, dataset, dataset_batches, loader
+
 
 
 ###################################################################################################################################
@@ -340,8 +582,12 @@ def get_trip_lengths_from_loader(data_loader) -> list:
     """
     # obtain the sequences from train_loader for plotting
     trip_lengths = []
-    for _, _, lengths in data_loader:
-        trip_lengths.append(lengths.tolist())
+    try:
+        for _, _, lengths in data_loader:
+            trip_lengths.append(lengths.tolist())
+    except:
+        for _, _, _, lengths in data_loader:
+            trip_lengths.append(lengths.tolist())
 
     # Move shortest batch to the end:
     incomplete_batch = min(trip_lengths, key=len)

@@ -5,7 +5,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 
 
-def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root):
+def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root) -> tuple:
     
     # PREPARE TRAIN & TEST SET ---------------------------------------------------
     all_files = [Path(input_folder, f) for f in os.listdir(input_folder) if f.endswith(".parquet")]
@@ -17,7 +17,7 @@ def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root):
     # ---------------------------------------------------
     df = pd.read_parquet(Path(input_folder, random.choice(files)), engine='pyarrow')
     all_signals = df.columns
-    assert len(all_signals) == 44
+    assert len(all_signals) == 46, f"Expected 46 signals, but got {len(all_signals)}"
 
     # FILTER INPUT FILES --------------------------------------------------------
     # generate lengths of all files by reading metadata or using presaved lengths
@@ -55,7 +55,7 @@ def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root):
     return files, trip_lengths, indices_by_length, sorted_trip_lengths, all_signals
 
 
-def print_dataset_sizes(train_dataset, val_dataset, test_dataset, train_subset, val_subset, test_subset, files):
+def print_dataset_sizes(train_dataset, val_dataset, test_dataset, train_subset, val_subset, test_subset, files) -> dict:
     print(f"{'-'*60}\nTrain size:  {len(train_dataset)}\t\t(Files: {len(train_subset)})")
     print(f'Val. size:   {len(val_dataset)}\t\t(Files: {len(val_subset)})')
     print(f'Test size:   {len(test_dataset)}\t\t(Files: {len(test_subset)}) \n {"-"*60}')
