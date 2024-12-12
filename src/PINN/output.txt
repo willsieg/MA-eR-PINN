@@ -1,0 +1,280 @@
+------------------------------------------------------------
+Directories:
+  /home/sieglew/MA-eR-PINN:			project, .gitignore, LICENSE, ref, test, README.md, data, src, .git, archive
+  /home/sieglew/MA-Data:			__init__.py, __pycache__, trips_processed_resampled, final, y_true, processed, TripSequences, trips_processed_pickles, final_2, trips_processed_final
+------------------------------------------------------------
+Running in script mode
+CONFIG Dictionary:
+---------------------------------------------------------------------------------------------------------------------------------
+     Parameter        Value
+--  ---------------  ------------------------------------------------------------------------------------------------------------
+0   GPU_SELECT       3
+1   ROOT             /home/sieglew/MA-eR-PINN
+2   INPUT_LOCATION   TripSequences/trips_processed_pinn
+3   OUTPUT_LOCATION  src/models/pth
+4   SEED             55
+5   PLOT_ACTIVE      True
+6   TRAIN_VAL_TEST   [0.8, 0.15, 0.05]
+7   MAX_FILES        None
+8   SCALERS          {'feature_scaler': 'MaxAbsScaler()', 'target_scaler': 'MaxAbsScaler()', 'prior_scaler': 'MaxAbsScaler()'}
+9   MIN_SEQ_LENGTH   600
+10  FEATURES         ['vehspd_cval_cpc',
+                      'altitude_cval_ippc',
+                      'airtempoutsd_cval_cpc',
+                      'roadgrad_cval_pt',
+                      'vehweight_cval_pt',
+                      'accelpdlposn_cval',
+                      'bs_brk_cval',
+                      'elcomp_pwrcons_cval',
+                      'motortemperature_pti1',
+                      'powerstagetemperature_pti1',
+                      'epto_pwr_cval',
+                      'airtempinsd_cval_hvac',
+                      'brktempra_cval',
+                      'selgr_rq_pt']
+11  TARGETS          ['soc_gradient']
+12  PRIORS           ['emot_pwr_pred']
+13  HIDDEN_SIZE      400
+14  NUM_LAYERS       2
+15  DROPOUT          0.5
+16  NUM_EPOCHS       50
+17  BATCH_SIZE       64
+18  LEARNING_RATE    0.001
+19  OPTIMIZER        torch.optim.AdamW(model.parameters(), lr = LEARNING_RATE, weight_decay = 1e-3)
+20  LRSCHEDULER      torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience = 2, factor = 0.5, min_lr = 1e-7)
+21  CRITERION        nn.SmoothL1Loss()
+22  LOSS_FN          F.mse_loss(output, target)
+23  MODE             train_mode
+24  TRAIN_LOG        test1.txt 
+---------------------------------------------------------------------------------------------------------------------------------
+
+Torch version:  2.5.1+cu124
+Using: -->  CUDA:3
+------------------------------------------------------------
+Total Files:	18629
+Filtered Files:	14050
+------------------------------------------------------------
+                FileName  Length  Index
+0        V13_T25.parquet   20843   1796
+1       V18_T775.parquet   19425   5324
+2       V13_T352.parquet   18308   1746
+3       V18_T972.parquet   17858   7030
+4      V16_T1629.parquet   17519   3550
+...                  ...     ...    ...
+14045   V12_T273.parquet     602  13860
+14046   V16_T522.parquet     601   2893
+14047  V18_T1549.parquet     601   6147
+14048   V18_T883.parquet     601   8194
+14049  V17_T3857.parquet     601   8206
+
+[14050 rows x 3 columns]
+------------------------------------------------------------
+Input Signals:	14
+Target Signals:	1
+Physical Prior Signals:	1
+------------------------------------------------------------
+ LSTM1(
+  (lstm): LSTM(14, 400, num_layers=2, batch_first=True, dropout=0.5)
+  (relu): ReLU()
+  (fc_test): Linear(in_features=400, out_features=1, bias=True)
+) ------------------------------------------------------------
+Model state_dict:
+lstm.weight_ih_l0:	 torch.Size([1600, 14])
+lstm.weight_hh_l0:	 torch.Size([1600, 400])
+lstm.bias_ih_l0:	 torch.Size([1600])
+lstm.bias_hh_l0:	 torch.Size([1600])
+lstm.weight_ih_l1:	 torch.Size([1600, 400])
+lstm.weight_hh_l1:	 torch.Size([1600, 400])
+lstm.bias_ih_l1:	 torch.Size([1600])
+lstm.bias_hh_l1:	 torch.Size([1600])
+fc_test.weight:	 torch.Size([1, 400])
+fc_test.bias:	 torch.Size([1])
+fitting Scalers: MaxAbsScaler, MaxAbsScaler, MaxAbsScaler
+	50% of the fitting done...
+Done. Create DataSets and DataLoaders...
+	Number of batches created: 176
+	Number of batches created: 33
+	Number of batches created: 11
+------------------------------------------------------------
+Train size:  36683135		(Files: 11241)
+Val. size:   6768674		(Files: 2107)
+Test size:   2425835		(Files: 702) 
+ ------------------------------------------------------------
+first 3 train files: ['V13_T25.parquet', 'V18_T775.parquet', 'V13_T352.parquet']
+------------------------------------------------------------
+AdamW (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    capturable: False
+    differentiable: False
+    eps: 1e-08
+    foreach: None
+    fused: None
+    lr: 0.001
+    maximize: False
+    weight_decay: 0.001
+)
+------------------------------------------------------------
+LRScheduler: <class 'torch.optim.lr_scheduler.ReduceLROnPlateau'>
+------------------------------------------------------------
+Loss_Fn: F.mse_loss(output, target)
+------------------------------------------------------------
+ Criterion: <class 'torch.nn.modules.loss.SmoothL1Loss'>
+------------------------------------------------------------
+
+------------------------------------------------------------
+Training Started.	Process ID: 3886953 
+------------------------------------------------------------
+Model: LSTM1	Parameters on device: CUDA:3
+------------------------------------------------------------
+Train/Batch size:	176 / 1
+Loss:			<function loss_fn_PINN_3 at 0x7f5ac011e1f0>
+Optimizer:		AdamW
+LR:			0.001
+Weight Decay:		0.001
+------------------------------------------------------------
+Epoch             Iteration         Batch Loss        Train Loss
+1/50              1/176             0.001007
+
+                  44                7e-06
+
+                  88                9e-06
+
+                  132               4e-06
+
+                  176               3e-06             4e-05
+
+Val               Validation Loss:  1.7e-05
+
+2/50              1/176             7e-06
+
+                  44                4e-06
+
+                  88                4e-06
+
+                  132               9e-06
+
+                  176               4e-06             5e-06
+
+Val               Validation Loss:  1.6e-05
+
+3/50              1/176             4e-06
+
+                  44                5e-06
+
+                  88                3e-06
+
+                  132               3e-06
+
+                  176               2e-06             5e-06
+
+Val               Validation Loss:  1.5e-05
+
+4/50              1/176             2e-06
+
+                  44                4e-06
+
+                  88                3e-06
+
+                  132               5e-06
+
+                  176               3e-06             4e-06
+
+Val               Validation Loss:  1.5e-05
+
+5/50              1/176             3e-06
+
+                  44                2e-06
+
+                  88                2e-06
+
+                  132               4e-06
+
+                  176               4e-06             4e-06
+
+Val               Validation Loss:  1.4e-05
+
+6/50              1/176             7e-06
+
+                  44                4e-06
+
+                  88                4e-06
+
+                  132               3e-06
+
+                  176               3e-06             4e-06
+
+Val               Validation Loss:  1.4e-05
+
+7/50              1/176             4e-06
+
+                  44                3e-06
+
+                  88                2e-06
+
+                  132               2e-06
+
+                  176               4e-06             3e-06
+
+Val               Validation Loss:  1.3e-05
+
+8/50              1/176             7e-06
+
+                  44                6e-06
+
+                  88                2e-06
+
+                  132               1e-06
+
+                  176               4e-06             4e-06
+
+Val               Validation Loss:  1.3e-05
+
+9/50              1/176             4e-06
+
+                  44                2e-06
+
+                  88                7e-06
+
+                  132               3e-06
+
+                  176               3e-06             3e-06
+
+Val               Validation Loss:  1.3e-05
+
+10/50             1/176             2e-06
+
+                  44                4e-06
+
+                  88                2e-06
+
+                  132               4e-06
+
+                  176               8e-06             3e-06
+
+Val               Validation Loss:  1.3e-05
+
+11/50             1/176             2e-06
+
+                  44                3e-06
+
+                  88                3e-06
+
+                  132               2e-06
+
+                  176               2e-06             2e-06
+
+Val               Validation Loss:  1.3e-05
+
+12/50             1/176             2e-06
+
+                  44                1e-06
+
+                  88                3e-06
+
+                  132               5e-06
+
+                  176               1e-06             3e-06
+
+Val               Validation Loss:  1.3e-05

@@ -116,6 +116,10 @@ class TripDataset_PINN(Dataset):
                 
             print(f"Done. Create DataSets and DataLoaders...")
 
+        # Check if the scalers are fitted on all samples
+        if not (self.scaler.n_samples_seen_ == self.target_scaler.n_samples_seen_ == self.prior_scaler.n_samples_seen_):
+            raise ValueError("Scalers are not equally fitted. Please ensure all scalers are fitted with the same number of samples before transforming the data.")
+
         # transform with fitted scalers
         cumulative_length = 0
         for i, file in enumerate(self.file_list):

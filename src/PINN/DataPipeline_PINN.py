@@ -33,14 +33,14 @@ CONFIG = {
     "INPUT_LOCATION":   Path("TripSequences", "trips_processed_pinn"), 
     "OUTPUT_LOCATION":  Path("src", "models", "pth"),
     "SEED"  :           55,
-    "PLOT_ACTIVE":      False,
+    "PLOT_ACTIVE":      True,
 
     # DATA PREPROCESSING: ---------------------------------------------------------
     "TRAIN_VAL_TEST":   [0.8, 0.15, 0.05], # [train, val, test splits]
-    "MAX_FILES":        2000, # None: all files
+    "MAX_FILES":        None, # None: all files
     "SCALERS":          {'feature_scaler': 'MaxAbsScaler()',
-                         'target_scaler': 'MaxAbsScaler()',
-                         'prior_scaler': 'MaxAbsScaler()'},
+                         'target_scaler': 'StandardScaler()',
+                         'prior_scaler': 'StandardScaler()'},
     "MIN_SEQ_LENGTH":   600, # minimum sequence length in s to be included in DataSets
 
     # FEATURES: -------------------------------------------------------------------
@@ -58,8 +58,8 @@ CONFIG = {
     "DROPOUT":          0.5,
     
     # TRAINING & OPTIMIZER: --------------------------------------------------------
-    "NUM_EPOCHS":       100,
-    "BATCH_SIZE":       32,   # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
+    "NUM_EPOCHS":       30,
+    "BATCH_SIZE":       16,   # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
     "LEARNING_RATE":    1e-3,   # 0.001 lr
     "OPTIMIZER":        "torch.optim.AdamW(model.parameters(), lr = LEARNING_RATE, weight_decay = 1e-3)",      
                         # weight_decay = 1e-4     # weight decay coefficient (default: 1e-2)
@@ -245,7 +245,7 @@ def loss_fn_PINN_2(output, target, prior):
     return total_loss
 
 def loss_fn_PINN_3(output, target, prior):
-    l_p = 0.2
+    l_p = 0.5
 
     y_pred = output
     y_true = target
@@ -284,7 +284,7 @@ CHECKPOINT, model_destination_path = save_checkpoint(TRAINER, train_loader, val_
 # +
 # #%%skip
 # LOAD MODEL -----------------------------------------------------------------
-#model_destination_path = Path(pth_folder, "LSTM1_packed_241206_155418.pth")
+#model_destination_path = Path(pth_folder, "LSTM1_241211_200821.pth")
 CHECKPOINT = load_checkpoint(model_destination_path, DEVICE)
 
 # get model type:
