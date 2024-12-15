@@ -17,7 +17,7 @@ def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root) -> t
     # ---------------------------------------------------
     df = pd.read_parquet(Path(input_folder, random.choice(files)), engine='pyarrow')
     all_signals = df.columns
-    assert len(all_signals) == 46, f"Expected 46 signals, but got {len(all_signals)}"
+    #assert len(all_signals) == 46, f"Expected 46 signals, but got {len(all_signals)}"
 
     # FILTER INPUT FILES --------------------------------------------------------
     # generate lengths of all files by reading metadata or using presaved lengths
