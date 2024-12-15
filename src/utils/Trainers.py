@@ -85,16 +85,15 @@ class PTrainer_PINN():
                     outputs = outputs.detach().cpu().numpy()
                     targets = targets.detach().cpu().numpy()
                     priors = priors.detach().cpu().numpy()
-                    # Remove the padded endings of each sequence and restore their original lengths
-                    unpadded_outputs = [output[:length] for output, length in zip(outputs, original_lengths)]
-                    unpadded_targets = [target[:length] for target, length in zip(targets, original_lengths)]
-                    unpadded_priors = [prior[:length] for prior, length in zip(priors, original_lengths)]
+                    original_lengths = original_lengths.detach().cpu().numpy()
                     # -------------------------------------
+                    # Remove the padded endings of each sequence and restore their original lengths
                     # Collect all outputs and targets
-                    all_outputs.append(unpadded_outputs)
-                    all_targets.append(unpadded_targets)
-                    all_priors.append(unpadded_priors)
-                    all_original_lengths.append(original_lengths.detach().cpu().numpy())
+                    for seq_output, seq_target, seq_prior, seq_length in zip(outputs, targets, priors, original_lengths):
+                        all_outputs.append(seq_output[:seq_length])
+                        all_targets.append(seq_target[:seq_length])
+                        all_priors.append(seq_prior[:seq_length])
+                        all_original_lengths.append(seq_length)
             # -------------------------------------
             test_loss /= len(self.test_loader)  # Calculate average test loss
             return test_loss, all_outputs, all_targets, all_priors, all_original_lengths
@@ -362,14 +361,14 @@ class PTrainer_Standard():
                     # Detach tensors from the computation graph and move them to CPU
                     outputs = outputs.detach().cpu().numpy()
                     targets = targets.detach().cpu().numpy()
-                    # Remove the padded endings of each sequence and restore their original lengths
-                    unpadded_outputs = [output[:length] for output, length in zip(outputs, original_lengths)]
-                    unpadded_targets = [target[:length] for target, length in zip(targets, original_lengths)]
+                    original_lengths = original_lengths.detach().cpu().numpy()
                     # -------------------------------------
+                    # Remove the padded endings of each sequence and restore their original lengths
                     # Collect all outputs and targets
-                    all_outputs.append(unpadded_outputs)
-                    all_targets.append(unpadded_targets)
-                    all_original_lengths.append(original_lengths.detach().cpu().numpy())
+                    for seq_output, seq_target, seq_prior, seq_length in zip(outputs, targets, priors, original_lengths):
+                        all_outputs.append(seq_output[:seq_length])
+                        all_targets.append(seq_target[:seq_length])
+                        all_original_lengths.append(seq_length)
             # -------------------------------------
             test_loss /= len(self.test_loader)  # Calculate average test loss
             return test_loss, all_outputs, all_targets, all_original_lengths

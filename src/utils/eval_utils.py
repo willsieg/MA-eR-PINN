@@ -109,7 +109,8 @@ def plot_prediction(y_true, y_pred, plot_active=True):
           plt.legend()
 
 
-# RESHAPE EVALUATION OUTPUTS ------------------------------------------------------
+'''
+# RESHAPE EVALUATION OUTPUTS (NOT REQUIRED)------------------------------------------------------
 def concat_outputs_targets(outputs, targets, original_lengths) -> tuple:
     all_outputs, all_targets, all_original_lengths = [], [], []
     for batch_outputs, batch_targets, batch_lengths in zip(outputs, targets, original_lengths):
@@ -127,3 +128,4 @@ def concat_outputs_targets_priors(outputs, targets, priors, original_lengths) ->
         all_priors.extend(batch_priors)
         all_original_lengths.extend(batch_lengths)
         return all_outputs, all_targets, all_priors, all_original_lengths
+'''       

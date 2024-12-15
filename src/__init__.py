@@ -73,5 +73,7 @@ def setup_environment(CONFIG, ROOT, SEED, GPU_SELECT):
     print(f"Using: -->  {str(DEVICE).upper()}")
 
     torch.manual_seed(SEED); random.seed(SEED); np.random.seed(SEED)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(SEED)
 
     return DATA_PATH, IS_NOTEBOOK, DEVICE
