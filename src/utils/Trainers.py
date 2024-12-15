@@ -225,7 +225,7 @@ class PTrainer_PINN():
 
                     # -------------------------------------------------------------
                     # Update the performance table
-                    if iter % (num_iterations // 4) == 0 and iter != num_iterations // 4 * 4:
+                    if iter % (num_iterations // 4) == 0 and iter != num_iterations // 4 * 4 and False:
                         add_row(self.training_table, f" ", f"{iter}", f"{loss.item():.6f}", " ")
                         self.only_log(f"{epoch:<14}{iter:<14}{loss.item():.6f}")
                         if self.is_notebook:
@@ -348,7 +348,7 @@ class PTrainer_Standard():
                             mask = torch.arange(outputs.size(1))[None, :] < original_lengths[:, None]
                             outputs_masked = outputs[mask]
                             targets_masked = targets[mask]
-                            loss = self.loss_fn(outputs_masked.squeeze(), targets_masked).mean()
+                            loss = self.loss_fn(outputs_masked.squeeze(), targets_masked)
                             test_loss += loss.item()
                     else:
                         outputs = self.model(inputs)  # inputs are packed, outputs are not ! --> see forward method in model
@@ -356,7 +356,7 @@ class PTrainer_Standard():
                         mask = torch.arange(outputs.size(1))[None, :] < original_lengths[:, None]
                         outputs_masked = outputs[mask]
                         targets_masked = targets[mask]
-                        loss = self.loss_fn(outputs_masked.squeeze(), targets_masked).mean()
+                        loss = self.loss_fn(outputs_masked.squeeze(), targets_masked)
                         test_loss += loss.item()
                     # -------------------------------------
                     # Detach tensors from the computation graph and move them to CPU
@@ -392,7 +392,7 @@ class PTrainer_Standard():
                             mask = torch.arange(outputs.size(1))[None, :] < original_lengths[:, None]
                             outputs = outputs[mask]
                             targets = targets[mask]
-                            loss = self.loss_fn(outputs.squeeze(), targets).mean()
+                            loss = self.loss_fn(outputs.squeeze(), targets)
                             val_loss += loss.item()
                     else:
                         outputs = self.model(inputs)  # inputs are packed, outputs are not ! --> see forward method in model
@@ -400,7 +400,7 @@ class PTrainer_Standard():
                         mask = torch.arange(outputs.size(1))[None, :] < original_lengths[:, None]
                         outputs = outputs[mask]
                         targets = targets[mask]
-                        loss = self.loss_fn(outputs.squeeze(), targets).mean()
+                        loss = self.loss_fn(outputs.squeeze(), targets)
                         val_loss += loss.item()
             # -------------------------------------          
             val_loss /= len(self.val_loader)  # Calculate average validation loss
@@ -475,7 +475,7 @@ class PTrainer_Standard():
                             mask = torch.arange(outputs.size(1))[None, :] < original_lengths[:, None]
                             outputs = outputs[mask]
                             targets = targets[mask]
-                            loss = self.loss_fn(outputs.squeeze(), targets).mean()
+                            loss = self.loss_fn(outputs.squeeze(), targets)
                         self.scaler.scale(loss).backward()  # Scale the loss and perform backward pass
                         if self.clip_value is not None:
                             nn.utils.clip_grad_value_(self.model.parameters(), clip_value=self.clip_value)  # optional: Gradient Value Clipping
@@ -500,7 +500,7 @@ class PTrainer_Standard():
                         #print(f"Shape of outputs after mask: {outputs.shape}, {type(outputs)}")
                         #print(f"Shape of targets after mask: {targets.shape}, {type(targets)}")
 
-                        loss = self.loss_fn(outputs.squeeze(), targets).mean()
+                        loss = self.loss_fn(outputs.squeeze(), targets)
                         loss.backward()
                         if self.clip_value is not None:
                             nn.utils.clip_grad_value_(self.model.parameters(), clip_value=self.clip_value)  # optional: Gradient Value Clipping
