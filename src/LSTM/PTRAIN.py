@@ -33,7 +33,7 @@ from pathlib import Path, WindowsPath, PosixPath
 CONFIG = {
     # SYSTEM: ---------------------------------------------------------------------
     "GPU_SELECT":       0, # {0,1,2,3, None: CPU only}
-    "ROOT":             Path('.').resolve(),
+    "ROOT":             Path('../..').resolve(),
     "INPUT_LOCATION":   Path("TripSequences", "trips_processed_pinn_2"), 
     "OUTPUT_LOCATION":  Path("src", "models", "pth"),
     "SEED"  :           1,
@@ -67,8 +67,8 @@ CONFIG = {
     "DROPOUT":          0.5,
     
     # TRAINING & OPTIMIZER: --------------------------------------------------------
-    "NUM_EPOCHS":       1,
-    "BATCH_SIZE":       16,   # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
+    "NUM_EPOCHS":       100,
+    "BATCH_SIZE":       8,   # [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
     "LEARNING_RATE":    2e-3,   # 0.001 lr
     "OPTIMIZER":        "torch.optim.AdamW(model.parameters(), lr = LEARNING_RATE, weight_decay = 1e-3)",      
                         # weight_decay = 1e-4     # weight decay coefficient (default: 1e-2)
