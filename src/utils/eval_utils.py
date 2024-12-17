@@ -21,7 +21,7 @@ def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, 
 
     # Create unique identifier for model name
     model_name_id = f'{trainer.model.__class__.__name__}_{datetime.now().strftime("%y%m%d_%H%M%S")}'
-    model_destination_path = Path(pth_folder, model_name_id + ".pth")
+    model_destination_path = Path(pth_folder, model_name_id + ".pt")
 
     # Save checkpoint
     torch.save(checkpoint, model_destination_path, pickle_protocol=pickle.HIGHEST_PROTOCOL)

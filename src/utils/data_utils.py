@@ -109,7 +109,9 @@ class TripDataset_PINN(Dataset):
                 p = df[prior_column].values.reshape(-1, 1)
                 self.scaler.partial_fit(X)
                 self.target_scaler.partial_fit(y)
-                self.prior_scaler.partial_fit(p)
+
+                # IMPORTANT: Scale the prior scaler on target values, so it is identical to the target scaler!!
+                self.prior_scaler.partial_fit(y)   
             
                 # Print status info at 50%
                 if i == num_files // 2: print(f"\t50% of the fitting done...")

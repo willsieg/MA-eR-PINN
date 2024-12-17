@@ -26,7 +26,7 @@ def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root) -> t
         presaved_lengths = presaved_lengths.set_index('FileName').to_dict()['Length']
         trip_lengths = [presaved_lengths[file.name] for file in files]
     except:
-        print(f"{'-'*60}\nObtaining sequence lengths... (may take up to 5 minutes)")
+        print(f"{'-'*60}\nObtaining sequence lengths... ")
         trip_lengths = [pq.read_metadata(file).num_rows for file in files]
 
     # discard all items shorter than min_seq_length

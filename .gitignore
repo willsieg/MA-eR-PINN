@@ -1,3 +1,9 @@
+# Add:
+test_loader.pth
+train_loader.pth
+val_loader.pth
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
