@@ -1,3 +1,7 @@
+
+# use this to mirror the repo to another one 
+#https://docs.github.com/en/repositories/creating-and-managing-repositories/duplicating-a-repository?platform=windows
+
 # Add:
 test_loader.pth
 train_loader.pth
