@@ -7,7 +7,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from sklearn.metrics import mean_squared_error, root_mean_squared_error
+from sklearn.metrics import mean_squared_error, root_mean_squared_error, r2_score
+from tabulate import tabulate
 
 
 
@@ -21,7 +22,20 @@ def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, 
 
     # Create unique identifier for model name
     model_name_id = f'{trainer.model.__class__.__name__}_{datetime.now().strftime("%y%m%d_%H%M%S")}'
+    checkpoint['model_name_id'] = model_name_id
     model_destination_path = Path(pth_folder, model_name_id + ".pt")
+
+    if trainer.log_file:
+        log_file_path = Path(pth_folder, model_name_id + "_log.txt")
+        with open(trainer.log_file, 'r') as original_log, open(log_file_path, 'w') as new_log:
+            
+            new_log.write(original_log.read())
+            config_df = pd.DataFrame(list(config.items()), columns=['Parameter', 'Value'])
+            config_df['Value'] = config_df['Value'].apply(lambda x: str(x).replace(',', ',\n') if len(str(x)) > 60 else str(x))
+        
+            new_log.write(f"CONFIG Dictionary:\n{'-'*60}\n")
+            new_log.write(tabulate(config_df, headers='keys', colalign=("left", "left"), maxcolwidths=[30, 60]))
+            new_log.write(f"\n{'-'*60}\n")
 
     # Save checkpoint
     torch.save(checkpoint, model_destination_path, pickle_protocol=pickle.HIGHEST_PROTOCOL)
@@ -63,7 +77,7 @@ def load_checkpoint(model_destination_path, DEVICE) -> dict:
 
 
 # PLOT TRAINING PERFORMANCE ------------------------------------------------------
-def plot_training_performance(training_df, train_losses_per_iter, train_losses, val_losses, lr_history, train_batches, num_epochs):
+def plot_training_performance(train_losses_per_iter, train_losses, val_losses, lr_history, train_batches, num_epochs, model_name_id):
     # plot training performance:
     fig, ax1 = plt.subplots(figsize=(14,4))
     ax1.set_xlabel('Epochs')
@@ -88,6 +102,9 @@ def plot_training_performance(training_df, train_losses_per_iter, train_losses, 
         ax2.tick_params(axis='y', labelcolor='green')
         ax2.set_yscale('log')
 
+    # Print model_name_id onto the plot
+    ax1.text(0.01, 0.95, f"Model ID: {model_name_id}", transform=ax1.transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
+
 # PLOT PREDICTION -----------------------------------------------------------------
 def plot_prediction(y_true, y_pred, plot_active=True):
      if plot_active:
@@ -108,6 +125,21 @@ def plot_prediction(y_true, y_pred, plot_active=True):
           plt.plot(np.arange(0, len(y_true), 1), savgol_filter(y_pred.flatten(), window_length=60, polyorder=3), label='Predicted Data (Smoothed)')  # predicted plot
           plt.legend()
 
+
+def calculate_metrics(y_true, y_pred):
+    metrics = {
+        "rmse": root_mean_squared_error(y_true, y_pred),                  # Root Mean Squared Error
+        "mae": np.mean(np.abs(y_true - y_pred)),                          # Mean Absolute Error
+        "std_dev": np.std(y_true - y_pred),                               # Standard Deviation
+        "mape": np.mean(np.abs((y_true - y_pred) / y_true)) * 100,        # Mean Absolute Percentage Error
+        "r2": r2_score(y_true, y_pred),                                   # R-squared
+        "max_error": np.max(np.abs(y_true - y_pred))                      # Maximum Error
+        }
+
+    print(f"RMSE:\t\t\t{metrics['rmse']:.4f}\
+        \nMAE ± STD (MAPE):\t{metrics['mae']:.4f} ± {metrics['std_dev']:.4f} ({metrics['mape']:.2f}%)\nR-squared:\t\t{metrics['r2']:.4f}")
+    
+    return metrics
 
 '''
 # RESHAPE EVALUATION OUTPUTS (NOT REQUIRED)------------------------------------------------------

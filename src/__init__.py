@@ -27,6 +27,11 @@ torch.set_default_dtype(torch.float32); torch.set_printoptions(precision=6, sci_
 from torchmetrics.functional import mean_squared_error
 from pytorch_forecasting.metrics import MASE
 
+import optuna
+from optuna.trial import TrialState
+
+
+
 # SETUP ------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 def setup_environment(CONFIG, ROOT, SEED, GPU_SELECT):

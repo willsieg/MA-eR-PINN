@@ -21,7 +21,7 @@ class PTrainer_PINN():
                  train_loader: DataLoader, num_epochs: int, device: torch.device, 
                  is_notebook: bool = False, val_loader: DataLoader = None, test_loader: DataLoader = None, 
                  scheduler: torch.optim.lr_scheduler._LRScheduler = None, state: dict = None, 
-                 use_mixed_precision: bool = False, clip_value = None, log_file = None):
+                 use_mixed_precision: bool = False, clip_value = None, log_file = "current_run.txt"):
 
         self.model = model
         self.optimizer = optimizer
@@ -300,7 +300,7 @@ class PTrainer_Standard():
                  train_loader: DataLoader, num_epochs: int, device: torch.device, 
                  is_notebook: bool = False, val_loader: DataLoader = None, test_loader: DataLoader = None, 
                  scheduler: torch.optim.lr_scheduler._LRScheduler = None, state: dict = None, 
-                 use_mixed_precision: bool = False, clip_value = None, log_file = None):
+                 use_mixed_precision: bool = False, clip_value = None, log_file = "current_run.txt"):
 
         self.model = model
         self.optimizer = optimizer
