@@ -21,7 +21,7 @@ class PTrainer_PINN():
                  train_loader: DataLoader, num_epochs: int, device: torch.device, 
                  is_notebook: bool = False, val_loader: DataLoader = None, test_loader: DataLoader = None, 
                  scheduler: torch.optim.lr_scheduler._LRScheduler = None, state: dict = None, 
-                 use_mixed_precision: bool = False, clip_value = None, log_file = "current_run.txt"):
+                 use_mixed_precision: bool = False, clip_value = None, log_file = "latest_run.txt"):
 
         self.model = model
         self.optimizer = optimizer
@@ -144,7 +144,7 @@ class PTrainer_PINN():
         # output info on training process
         self.print_and_log(f"{'-'*60}\nTraining Started.\tProcess ID: {os.getpid()} \n{'-'*60}\n"
                       f"Model: {self.model.__class__.__name__}\tParameters on device: {str(next(self.model.parameters()).device).upper()}\n{'-'*60}\n"
-                      f"Train/Batch size:\t{len(self.train_loader.dataset)} / {self.train_loader.batch_size}\n"
+                      f"Train/Batch size:\t{len(self.train_loader.dataset)} / {len(self.train_loader)}\n"
                       f"Loss:\t\t\t{self.loss_fn_pinn}\nOptimizer:\t\t{self.optimizer.__class__.__name__}\nLR:\t\t\t"
                       f"{self.optimizer.param_groups[0]['lr']}\nWeight Decay:\t\t{self.optimizer.param_groups[0]['weight_decay']}\n{'-'*60}")
         

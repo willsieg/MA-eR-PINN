@@ -41,7 +41,7 @@ def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, 
     torch.save(checkpoint, model_destination_path, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
     # Check saved object size
-    print(f"Model saved to:\t {model_destination_path}\n{'-'*60}\nSize: {os.path.getsize(model_destination_path) / 1024**2:.2f} MB\n{'-'*60}")
+    print(f"Model saved to:\t {model_destination_path}\n{'-'*60}\nModel ID: {model_name_id}\n{'-'*60}\nSize: {os.path.getsize(model_destination_path) / 1024**2:.2f} MB\n{'-'*60}")
     if os.path.getsize(model_destination_path) > 100 * 1024**2: 
         print("--> Warning: saved model size exceeds 100MB! Creating a zip file instead ...")
         try:
@@ -73,23 +73,34 @@ def load_checkpoint(model_destination_path, DEVICE) -> dict:
         checkpoint = torch.load(model_destination_path, weights_only=False, map_location=DEVICE if torch.cuda.is_available() else torch.device('cpu'))
         pathlib.PosixPath = temp
 
+    print(f"Model loaded from:\t{model_destination_path}\n{'-'*60}\nModel: {checkpoint['model'].__class__.__name__}\tParameters on device: {next(checkpoint['model'].parameters()).device}"
+        f"\n{'-'*60}\nTrain/Batch size:\t{checkpoint['train_batches']} / {checkpoint['CONFIG']['BATCH_SIZE']}\n"
+        f"Loss:\t\t\t{checkpoint['loss_fn']}\nOptimizer:\t\t{checkpoint['optimizer'].__class__.__name__}\nLR:\t\t\t"
+        f"{checkpoint['optimizer'].param_groups[0]['lr']}\nWeight Decay:\t\t{checkpoint['optimizer'].param_groups[0]['weight_decay']}\n{'-'*60}\n")
+
     return checkpoint
 
 
 # PLOT TRAINING PERFORMANCE ------------------------------------------------------
-def plot_training_performance(train_losses_per_iter, train_losses, val_losses, lr_history, train_batches, num_epochs, model_name_id):
+def plot_training_performance(results):
+
+    # get required data from results dict
+    train_losses_per_iter = results['train_losses_per_iter']
+    train_losses, val_losses = results['train_losses'], results['val_losses']
+    lr_history = results['lr_history']
+    num_epochs = results['epoch']
+
     # plot training performance:
-    fig, ax1 = plt.subplots(figsize=(14,4))
+    fig, ax1 = plt.subplots(figsize=(12,3))
     ax1.set_xlabel('Epochs')
     ax1.set_xticks(range(1, num_epochs + 1))
 
-    assert len(train_losses_per_iter) == num_epochs * train_batches, "Length of train_losses_per_iter might not match the number of iterations."
     ax1.plot(np.linspace(1, num_epochs, len(train_losses_per_iter)), train_losses_per_iter, label='batch_loss', color='lightblue')
     ax1.plot(range(1, num_epochs + 1), train_losses, label='train_loss', color='blue')
     ax1.plot(range(1, num_epochs + 1), val_losses, label='val_loss', color='red')
 
     ax1.set_yscale('log')
-    fig.tight_layout()
+    fig.tight_layout(pad=0.8)
     ax1.legend()
 
     ax1.text(0.86, 0.6, f"Train: {train_losses[-1]:.3e}\nVal:    {val_losses[-1]:.3e}", \
@@ -102,8 +113,6 @@ def plot_training_performance(train_losses_per_iter, train_losses, val_losses, l
         ax2.tick_params(axis='y', labelcolor='green')
         ax2.set_yscale('log')
 
-    # Print model_name_id onto the plot
-    ax1.text(0.01, 0.95, f"Model ID: {model_name_id}", transform=ax1.transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
 
 # PLOT PREDICTION -----------------------------------------------------------------
 def plot_prediction(y_true, y_pred, plot_active=True):
