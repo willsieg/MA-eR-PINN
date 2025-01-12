@@ -103,6 +103,7 @@ def plot_training_performance(results):
     fig.tight_layout(pad=0.8)
     ax1.legend()
 
+
     ax1.text(0.86, 0.6, f"Train: {train_losses[-1]:.3e}\nVal:    {val_losses[-1]:.3e}", \
         transform=ax1.transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
 
@@ -112,6 +113,8 @@ def plot_training_performance(results):
         ax2.set_ylabel('Learning Rate', color='green')
         ax2.tick_params(axis='y', labelcolor='green')
         ax2.set_yscale('log')
+
+    plt.show()
 
 
 # PLOT PREDICTION -----------------------------------------------------------------
