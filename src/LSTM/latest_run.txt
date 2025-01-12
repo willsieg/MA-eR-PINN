@@ -1,31 +1,56 @@
 ------------------------------------------------------------
-Training Started.	Process ID: 23576 
+Training Started.	Process ID: 1095085 
 ------------------------------------------------------------
-Model: LSTM1_packed_old_version	Parameters on device: CPU
+Model: LSTM1_packed_old_version	Parameters on device: CUDA:0
 ------------------------------------------------------------
-Train/Batch size:	27 / 27
-Loss:			<function loss_fn_PINN_3 at 0x000001CAA5D5BB00>
+Train/Batch size:	306 / 306
+Loss:			<function objective.<locals>.loss_fn_PINN_3 at 0x7f71b072f740>
 Optimizer:		AdamW
 LR:			0.01
-Weight Decay:		0.001
+Weight Decay:		0.01
 ------------------------------------------------------------
 
 ------------------------------------------------------------
 Epoch         Iteration     Batch Loss      Train Loss    
 ------------------------------------------------------------
-1             1             0.070589
-1             27            0.011616		0.030273
+1             1             0.340543
+1             306           0.039160		0.016043
 
-Val           Validation Loss:				0.013557
+Val           Validation Loss:				0.006020
 
 ------------------------------------------------------------
 Epoch         Iteration     Batch Loss      Train Loss    
 ------------------------------------------------------------
-2             1             0.010668
-2             27            0.007459		0.007396
+2             1             0.005404
+2             306           0.001486		0.007808
 
-Val           Validation Loss:				0.014619
+Val           Validation Loss:				0.031033
+
 ------------------------------------------------------------
-Training Completed.	Execution Time: 00:02:59
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+3             1             0.017914
+3             306           0.001842		0.006726
+
+Val           Validation Loss:				0.009109
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+4             1             0.008684
+4             306           0.002950		0.003489
+
+Val           Validation Loss:				0.011005
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+5             1             0.001412
+5             306           0.004169		0.002808
+Learning rate updated after epoch 5: 0.01 -> 0.005
+
+Val           Validation Loss:				0.014591
+------------------------------------------------------------
+Training Completed.	Execution Time: 00:04:26
 ------------------------------------------------------------
 
