@@ -1,10 +1,10 @@
 ------------------------------------------------------------
-Training Started.	Process ID: 24500 
+Training Started.	Process ID: 22796 
 ------------------------------------------------------------
 Model: LSTM1_packed_old_version	Parameters on device: CPU
 ------------------------------------------------------------
-Train/Batch size:	27 / 27
-Loss:			<function objective.<locals>.loss_fn_PINN_3 at 0x0000023E0946BF60>
+Train/Batch size:	27 / 1
+Loss:			<function loss_fn_PINN_3 at 0x000001A3429ABA60>
 Optimizer:		AdamW
 LR:			0.01
 Weight Decay:		0.001
@@ -13,19 +13,19 @@ Weight Decay:		0.001
 ------------------------------------------------------------
 Epoch         Iteration     Batch Loss      Train Loss    
 ------------------------------------------------------------
-1             1             0.233749
-1             27            0.068595		0.094555
+1             1             0.070589
+1             27            0.011616		0.030273
 
-Val           Validation Loss:				0.051719
+Val           Validation Loss:				0.013557
 
 ------------------------------------------------------------
 Epoch         Iteration     Batch Loss      Train Loss    
 ------------------------------------------------------------
-2             1             0.062864
-2             27            0.100312		0.055855
+2             1             0.010668
+2             27            0.007459		0.007396
 
-Val           Validation Loss:				0.052077
+Val           Validation Loss:				0.014619
 ------------------------------------------------------------
-Training Completed.	Execution Time: 00:02:26
+Training Completed.	Execution Time: 00:03:24
 ------------------------------------------------------------
 

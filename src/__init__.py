@@ -25,7 +25,7 @@ torch.set_default_dtype(torch.float32); torch.set_printoptions(precision=6, sci_
 #mp.set_start_method('spawn', force=True)
 
 from torchmetrics.functional import mean_squared_error
-#from pytorch_forecasting.metrics import MASE
+from pytorch_forecasting.metrics import MASE
 
 import optuna
 from optuna.trial import TrialState
