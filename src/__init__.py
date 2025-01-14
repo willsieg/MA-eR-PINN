@@ -1,5 +1,5 @@
 from pathlib import Path, WindowsPath, PosixPath
-import math, time, random, pickle
+import math, time, random, pickle, sys, os
 import numpy as np
 import pandas as pd
 
@@ -36,7 +36,7 @@ from optuna.trial import TrialState
 # SETUP ------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 def setup_environment(CONFIG, ROOT, SEED, GPU_SELECT):
-    global DATA_PATH, IS_NOTEBOOK, DEVICE
+    global DATA_PATH, IS_NOTEBOOK, DEVICE, LOG_FILE_NAME, TS
 
     import sys, os
     print(f"{'-'*60}\nDirectories:\n  {ROOT}:\t\t\t{', '.join([_.name for _ in ROOT.glob('*/')])}")
@@ -80,4 +80,26 @@ def setup_environment(CONFIG, ROOT, SEED, GPU_SELECT):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(SEED)
 
-    return DATA_PATH, IS_NOTEBOOK, DEVICE
+    LOG_FILE_NAME, TS = generate_log_file_name(Path(ROOT, 'src', 'models', 'log'))
+
+    print(f"Timestamp: {TS}")
+
+    return DATA_PATH, IS_NOTEBOOK, DEVICE, LOG_FILE_NAME, TS 
+
+class Tee:
+    def __init__(self, *files): self.files = files
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()  # Ensure the output is written immediately
+    def flush(self):
+        for f in self.files: f.flush()
+    def close(self): 
+        for f in self.files: 
+            if f not in (sys.stdout, sys.stderr): f.close()
+
+def generate_log_file_name(dir):
+    timestamp = datetime.now().strftime('%y%m%d_%H%M%S')
+    log_file_name = f"{timestamp}.txt"
+
+    return os.path.join(dir, log_file_name), timestamp

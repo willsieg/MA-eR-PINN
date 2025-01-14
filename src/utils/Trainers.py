@@ -132,7 +132,7 @@ class PTrainer_PINN():
             val_loss /= len(self.val_loader)  # Calculate average validation loss
             if self.scheduler:
                 lr1 = self.scheduler.get_last_lr()[0]
-                self.scheduler.step()  # Adjust learning rate based on validation loss
+                self.scheduler.step(val_loss)  # Adjust learning rate based on validation loss
                 lr2 = self.scheduler.get_last_lr()[0]
                 self.lr_history.append(lr2)
                 if lr1 != lr2: self.print_and_log(f"Learning rate updated after epoch {epoch}: {lr1} -> {lr2}")
@@ -287,7 +287,8 @@ class PTrainer_PINN():
             # settings and meta data
             "loss_fn": self.loss_fn_pinn,
             "epoch": epoch,
-            "elapsed_train_time": elapsed_time
+            "elapsed_train_time": elapsed_time,
+            "log_file": self.log_file
         }
 
 

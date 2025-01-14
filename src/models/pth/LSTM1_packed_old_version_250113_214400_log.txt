@@ -1,0 +1,327 @@
+------------------------------------------------------------
+Training Started.	Process ID: 1611795 
+------------------------------------------------------------
+Model: LSTM1_packed_old_version	Parameters on device: CUDA:0
+------------------------------------------------------------
+Train/Batch size:	63 / 63
+Loss:			<function loss_fn_PINN_3 at 0x7f62906d0ea0>
+Optimizer:		AdamW
+LR:			0.0003
+Weight Decay:		0.0001
+------------------------------------------------------------
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+1             1             1.069399
+1             63            0.721824		0.803736
+
+Val           Validation Loss:				0.532541
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+2             1             0.440873
+2             63            0.309705		0.449438
+
+Val           Validation Loss:				0.282341
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+3             1             0.343302
+3             63            0.254436		0.347500
+
+Val           Validation Loss:				0.213437
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+4             1             0.278303
+4             63            0.362771		0.293757
+
+Val           Validation Loss:				0.192117
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+5             1             0.170600
+5             63            0.390187		0.254047
+
+Val           Validation Loss:				0.167635
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+6             1             0.199969
+6             63            0.267032		0.223856
+
+Val           Validation Loss:				0.126548
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+7             1             0.321879
+7             63            0.111570		0.199531
+
+Val           Validation Loss:				0.096489
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+8             1             0.256709
+8             63            0.065953		0.179781
+
+Val           Validation Loss:				0.084090
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+9             1             0.231371
+9             63            0.125578		0.163729
+
+Val           Validation Loss:				0.069214
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+10            1             0.186339
+10            63            0.118724		0.148997
+
+Val           Validation Loss:				0.063842
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+11            1             0.104661
+11            63            0.131963		0.138807
+
+Val           Validation Loss:				0.050906
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+12            1             0.071601
+12            63            0.064203		0.129995
+
+Val           Validation Loss:				0.042031
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+13            1             0.119390
+13            63            0.136494		0.123123
+
+Val           Validation Loss:				0.035825
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+14            1             0.136958
+14            63            0.105014		0.118025
+
+Val           Validation Loss:				0.031002
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+15            1             0.077750
+15            63            0.128272		0.113639
+
+Val           Validation Loss:				0.031020
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+16            1             0.070510
+16            63            0.067841		0.110642
+
+Val           Validation Loss:				0.022411
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+17            1             0.165706
+17            63            0.109441		0.108859
+
+Val           Validation Loss:				0.023398
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+18            1             0.079299
+18            63            0.185619		0.107006
+
+Val           Validation Loss:				0.025490
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+19            1             0.062289
+19            63            0.077408		0.106636
+
+Val           Validation Loss:				0.020352
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+20            1             0.159670
+20            63            0.057891		0.105080
+
+Val           Validation Loss:				0.018919
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+21            1             0.110975
+21            63            0.080969		0.105357
+
+Val           Validation Loss:				0.018115
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+22            1             0.143523
+22            63            0.071594		0.104617
+
+Val           Validation Loss:				0.016674
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+23            1             0.170841
+23            63            0.216145		0.104027
+
+Val           Validation Loss:				0.017690
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+24            1             0.089884
+24            63            0.170079		0.103647
+
+Val           Validation Loss:				0.018529
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+25            1             0.157335
+25            63            0.217772		0.103711
+
+Val           Validation Loss:				0.019471
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+26            1             0.075576
+26            63            0.067644		0.103330
+
+Val           Validation Loss:				0.019890
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+27            1             0.060009
+27            63            0.098489		0.103083
+
+Val           Validation Loss:				0.016082
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+28            1             0.105709
+28            63            0.105339		0.102602
+
+Val           Validation Loss:				0.018624
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+29            1             0.103604
+29            63            0.067658		0.102964
+
+Val           Validation Loss:				0.017892
+
+------------------------------------------------------------
+Epoch         Iteration     Batch Loss      Train Loss    
+------------------------------------------------------------
+30            1             0.076034
+30            63            0.093521		0.102642
+
+Val           Validation Loss:				0.019830
+------------------------------------------------------------
+Training Completed.	Execution Time: 00:11:03
+------------------------------------------------------------
+
+CONFIG Dictionary:
+------------------------------------------------------------
+    Parameter         Value
+--  ----------------  --------------------------------------------
+0   GPU_SELECT        0
+1   ROOT              /home/sieglew/MA-eR-PINN
+2   INPUT_LOCATION    TripSequences/trips_processed_pinn_2
+3   OUTPUT_LOCATION   src/models/pth
+4   SEED              23
+5   PLOT_ACTIVE       True
+6   TRAIN_VAL_TEST    [0.8, 0.19, 0.01]
+7   MAX_FILES         None
+8   MIN_SEQ_LENGTH    5400
+9   SCALERS           {'feature_scaler': 'StandardScaler()',
+                       'target_scaler': 'StandardScaler()',
+                       'prior_scaler': 'StandardScaler()'}
+10  FEATURES          ['accelpdlposn_cval',
+                       'actdrvtrnpwrprc_cval',
+                       'actualdcvoltage_pti1',
+                       'actualspeed_pti1',
+                       'actualtorque_pti1',
+                       'airtempinsd_cval_hvac',
+                       'airtempinsd_rq',
+                       'airtempoutsd_cval_cpc',
+                       'altitude_cval_ippc',
+                       'brc_stat_brc1',
+                       'brktempra_cval',
+                       'bs_brk_cval',
+                       'currpwr_contendrnbrkresist_cval',
+                       'elcomp_pwrcons_cval',
+                       'epto_pwr_cval',
+                       'hv_bat_dc_momvolt_cval_bms1',
+                       'hv_batavcelltemp_cval_bms1',
+                       'hv_batcurr_cval_bms1',
+                       'hv_batisores_cval_e2e',
+                       'hv_batmaxchrgpwrlim_cval_1',
+                       'hv_batmaxdischrgpwrlim_cval_1',
+                       'hv_curr_cval_dcl1',
+                       'hv_dclink_volt_cval_dcl1',
+                       'hv_ptc_cabin1_pwr_cval',
+                       'hv_pwr_cval_dcl1',
+                       'lv_convpwr_cval_dcl1',
+                       'maxrecuppwrprc_cval',
+                       'maxtracpwrpct_cval',
+                       'motortemperature_pti1',
+                       'powerstagetemperature_pti1',
+                       'rmsmotorcurrent_pti1',
+                       'roadgrad_cval_pt',
+                       'selgr_rq_pt',
+                       'start_soc',
+                       'txoiltemp_cval_tcm',
+                       'vehspd_cval_cpc',
+                       'vehweight_cval_pt']
+11  TARGETS           ['hv_bat_soc_cval_bms1']
+12  PRIORS            ['emot_soc_pred']
+13  HIDDEN_SIZE       10
+14  NUM_LAYERS        1
+15  DROPOUT           0.3
+16  NUM_EPOCHS        30
+17  BATCH_SIZE        32
+18  LEARNING_RATE     0.0003
+19  WEIGHT_DECAY      0.0001
+20  MOMENTUM_SGD      0.1
+21  OPTIMIZER         adamw
+22  WEIGHT_INIT_TYPE  normal
+23  CLIP_GRAD         0.5
+24  LRSCHEDULER       torch.optim.lr_scheduler.LambdaLR(optimizer,
+                       lr_lambda=lr_lambda)
+25  CRITERION         nn.SmoothL1Loss()
+26  LOSS_FN           F.mse_loss(output, target)
+27  P_LOSS_FACTOR     0.0
+------------------------------------------------------------

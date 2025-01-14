@@ -12,7 +12,7 @@ from tabulate import tabulate
 
 
 
-def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, config, subset_files, pth_folder) -> tuple:
+def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, config, subset_files, pth_folder, timestamp) -> tuple:
 
     # Collecting results and meta data for saving dict
     trainer_add_info = {key: getattr(trainer, key) for key in ['model', 'optimizer', 'scheduler', 'state', 'clip_value', 'device', 'use_mixed_precision']}
@@ -21,7 +21,7 @@ def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, 
     checkpoint = {**checkpoint, **trainer_add_info, **subset_files, **loader_sizes}
 
     # Create unique identifier for model name
-    model_name_id = f'{trainer.model.__class__.__name__}_{datetime.now().strftime("%y%m%d_%H%M%S")}'
+    model_name_id = f'{trainer.model.__class__.__name__}_{timestamp}'
     checkpoint['model_name_id'] = model_name_id
     model_destination_path = Path(pth_folder, model_name_id + ".pt")
 
@@ -42,6 +42,7 @@ def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, 
 
     # Check saved object size
     print(f"Model saved to:\t {model_destination_path}\n{'-'*60}\nModel ID: {model_name_id}\n{'-'*60}\nSize: {os.path.getsize(model_destination_path) / 1024**2:.2f} MB\n{'-'*60}")
+    print(f"log_file: checkpoint['log_file']")
     if os.path.getsize(model_destination_path) > 100 * 1024**2: 
         print("--> Warning: saved model size exceeds 100MB! Creating a zip file instead ...")
         try:
@@ -89,6 +90,7 @@ def plot_training_performance(results):
     train_losses, val_losses = results['train_losses'], results['val_losses']
     lr_history = results['lr_history']
     num_epochs = results['epoch']
+    log_file = results['log_file']
 
     # plot training performance:
     fig, ax1 = plt.subplots(figsize=(12,3))
@@ -103,9 +105,11 @@ def plot_training_performance(results):
     fig.tight_layout(pad=0.8)
     ax1.legend()
 
-
     ax1.text(0.86, 0.6, f"Train: {train_losses[-1]:.3e}\nVal:    {val_losses[-1]:.3e}", \
         transform=ax1.transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
+
+    # Add the log file name to the plot
+    fig.text(0.01, 0.01, f"Log: {os.path.basename(log_file)}", fontsize=8, color='gray', alpha=0.7)
 
     if pd.Series(lr_history).nunique() > 1:
         ax2 = ax1.twinx()
@@ -113,6 +117,10 @@ def plot_training_performance(results):
         ax2.set_ylabel('Learning Rate', color='green')
         ax2.tick_params(axis='y', labelcolor='green')
         ax2.set_yscale('log')
+
+
+    # Save the plot to the log file
+    plt.savefig(Path(log_file).with_suffix('.png'))
 
     plt.show()
 
