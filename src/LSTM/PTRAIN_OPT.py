@@ -27,18 +27,18 @@ PTRAIN - Standard Pipeline Framework for Training the PINN
 from pathlib import Path
 CONFIG = {
     # SYSTEM: ---------------------------------------------------------------------
-    "GPU_SELECT":       0, # {0,1,2,3, None: CPU only}
+    "GPU_SELECT":       0,
     "ROOT":             Path('../..').resolve(),
     "INPUT_LOCATION":   Path("TripSequences", "trips_processed_pinn_2"), 
     "OUTPUT_LOCATION":  Path("src", "models", "pth"),
-    "SEED"  :           23,
-    "PLOT_ACTIVE":      True,
+    "SEED"  :           20,
+    "MIXED_PRECISION":  True,
 
     # DATA PREPROCESSING: ---------------------------------------------------------
-    "TRAIN_VAL_TEST":   [0.8, 0.19, 0.01], # [train, val, test splits]
+    "TRAIN_VAL_TEST":   [0.8, 0.1, 0.1], # [train, val, test splits]
     "MAX_FILES":        None, # None: all files
-    "MIN_SEQ_LENGTH":   5400, # minimum sequence length in s to be included in DataSets
-    "SCALERS":          {'feature_scaler': 'StandardScaler()','target_scaler': 'StandardScaler()','prior_scaler': 'StandardScaler()'},
+    "MIN_SEQ_LENGTH":   3600, # minimum sequence length in s to be included in DataSets
+    "SCALERS":          {'feature_scaler': 'MinMaxScaler()','target_scaler': 'MinMaxScaler()','prior_scaler': 'MinMaxScaler()'},
 
     # FEATURES: -------------------------------------------------------------------
     "FEATURES":         ['accelpdlposn_cval','actdrvtrnpwrprc_cval','actualdcvoltage_pti1','actualspeed_pti1','actualtorque_pti1',
@@ -52,50 +52,47 @@ CONFIG = {
     "PRIORS":           ['emot_soc_pred'],  
 
     # MODEL: -----------------------------------------------------------------------
-    "HIDDEN_SIZE":      10,    # features in the hidden state h
+    "HIDDEN_SIZE":      12,    # features in the hidden state h
     "NUM_LAYERS":       3,      # recurrent layers for stacked LSTMs. Default: 1
     "DROPOUT":          0.35,   # usually: [0.2 - 0.5]
     
     # TRAINING & OPTIMIZER: --------------------------------------------------------
     "NUM_EPOCHS":       10,
     "BATCH_SIZE":       32,         # [2, 4, 8, 16, 32, 64, 128, 256]
-    "LEARNING_RATE":    1e-2,       # 0.001 lr
-    "WEIGHT_DECAY":     1e-2,       # weight decay coefficient (default: 1e-2)
-    "MOMENTUM_SGD":     0.0,        # (default: 0.0)
+    "LEARNING_RATE":    1e-3,       # 0.001 lr
+    "WEIGHT_DECAY":     1e-3,       # weight decay coefficient (default: 1e-2)
+    "MOMENTUM_SGD":     0.1,        # (default: 0.0)
     "OPTIMIZER":        'adamw',    # ('adam', 'sgd', 'adamw')
-    "WEIGHT_INIT_TYPE": 'default',  # ('he', 'normal', 'default')
-    "CLIP_GRAD":        1.0,        # default: None
-    "LRSCHEDULER":      "torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience = 3, factor = 0.5, min_lr = 1e-7)",  # constant LR for 1.0 as multiplicative factor
-                        # torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda _: 1.0)
+    "WEIGHT_INIT_TYPE": 'he',  # ('he', 'normal', 'default')
+    "CLIP_GRAD":        2.0,        # default: None
+    "LRSCHEDULER":      "torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)",  # constant LR for 1.0 as multiplicative factor
                         # torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience = 3, factor = 0.5, min_lr = 1e-7)
 
     # LOSS FUNCTION: ---------------------------------------------------------------
     "CRITERION":        "nn.SmoothL1Loss()", # ['nn.MSELoss()', 'nn.L1Loss()', 'nn.SmoothL1Loss()', 'nn.HuberLoss()', 'MASE()']
-    "LOSS_FN":          "F.mse_loss(output, target)", # ['F.mse_loss(output, target)', 'F.l1_loss(output, target)', 'F.smooth_l1_loss(output, target)', 'F.huber_loss(output, target)', 'F.mase_loss(output, target)']
     "P_LOSS_FACTOR":    0.5, # Physics loss factor
 }
 
 # +
 # OPTUNA: SEARCH SPACE ---------------------------------------------------
+N_TRIALS = 50
+
 global search_space, search_space_NewData
 search_space = {
     # MODEL: -----------------------------------------------------------------------
-    'HIDDEN_SIZE': ('int', 2, 20, 1),
-    'NUM_LAYERS': ('int', 1, 8, 1),
-    'DROPOUT': ('float', 0.0, 0.4, 0.05),
-    'CLIP_GRAD': ('categorical', (0.01, 0.1, 0.5, 1.0, 1.5, 2.0, 5.0)),
+    'HIDDEN_SIZE': ('int', 10, 100, 10),
+    'NUM_LAYERS': ('int', 1, 5, 1),
+    'DROPOUT': ('float', 0.0, 0.6, 0.05),
+    'CLIP_GRAD': ('categorical', (None, 0.01, 0.1, 0.5, 1.0, 1.5, 2.0, 5.0)),
     'WEIGHT_INIT_TYPE': ('categorical', ('he', 'normal', 'default')),
-    #'BATCH_NORM_ON': ('categorical', (True, False)),
 
     # TRAINING & OPTIMIZER: --------------------------------------------------------
-    'OPTIMIZER': ('categorical', ('adam', 'sgd', 'adamw')),
-    'NUM_EPOCHS': ('int', 10, 40, 1),
-    'LEARNING_RATE': ('categorical', (1e-5, 5e-5, 1e-4, 3e-4, 5e-4, 8e-4, 1e-3, 3e-3, 5e-3, 8e-3, 1e-2, 2e-2, 5e-2, 1e-1)),
+    'OPTIMIZER': ('categorical', ('adam', 'adamw')),
+    #'NUM_EPOCHS': ('int', 5, 10, 1),
+    'LEARNING_RATE': ('categorical', (5e-5, 1e-4, 3e-4, 5e-4, 8e-4, 1e-3, 3e-3, 5e-3, 8e-3, 1e-2, 2e-2, 5e-2)),
     'WEIGHT_DECAY': ('categorical', (0.0, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2)),
-    'MOMENTUM_SGD': ('float', 0.0, 0.9, 0.1),
+    #'MOMENTUM_SGD': ('float', 0.0, 0.9, 0.1),
 
-    # LOSS: --------------------------------------------------------
-    #'CRITERION': ('categorical', ('nn.MSELoss()', 'nn.L1Loss()', 'nn.SmoothL1Loss()', 'nn.HuberLoss()')),
     #'P_LOSS_FACTOR': ('float', 0.05, 1.0, 0.05)
 }
 
@@ -105,18 +102,20 @@ search_space_NewData = {
     'BATCH_SIZE': ('categorical', (4, 8, 16, 32, 64, 128)),
 }
 
-N_TRIALS = 50
 
+# +
+# LOSS FUNCTION MODULES ----------------------------------------------------------------   
 
-# -
-
-# LOSS FUNCTION (REPLACE IN OBJECTIVE FUNCTION) ----------------------------------------------------------------   
 def loss_fn_PINN_3(output, target, prior):
     l_p = P_LOSS_FACTOR
     y_pred = output; y_true = target; y_phys = prior
     total_loss = F.mse_loss(y_true, (l_p * y_phys + (1 - l_p) * y_pred), reduction='mean')
     return total_loss
 
+global LOSS_FN
+LOSS_FN = loss_fn_PINN_3
+
+# -
 
 # ___
 # SETUP: Locate devices & system folders
@@ -138,16 +137,18 @@ from src.utils.Trainers import *
 from src.models.lstm_models import *
 
 # SETUP ENVIRONMENT ---------------------------------------------------------------------
-DATA_PATH, IS_NOTEBOOK, DEVICE = setup_environment(CONFIG, ROOT, SEED, GPU_SELECT)
+DATA_PATH, IS_NOTEBOOK, DEVICE, LOG_FILE_NAME, TS = setup_environment(CONFIG, ROOT, SEED, GPU_SELECT)
+if not IS_NOTEBOOK: output_file = open(f"{LOG_FILE_NAME}", "w"); sys.stdout = Tee(sys.stdout, output_file); sys.stderr = Tee(sys.stderr, output_file)
+
+# FILE SOURCES ---------------------------------------------------------------
+input_folder = Path(DATA_PATH, INPUT_LOCATION) # Trip parquet files
+pth_folder = Path(ROOT, OUTPUT_LOCATION, f"{TS}")
+pth_folder.mkdir(parents=True, exist_ok=True)
+files, trip_lengths, indices_by_length, sorted_trip_lengths, all_signals = prepare_data(input_folder, pth_folder, MAX_FILES, MIN_SEQ_LENGTH, ROOT)
 # -
 
 # ___
 # DATA SELECTION & PREPROCESSING
-
-# FILE SOURCES ---------------------------------------------------------------
-input_folder = Path(DATA_PATH, INPUT_LOCATION) # Trip parquet files
-pth_folder = Path(ROOT, OUTPUT_LOCATION)
-files, trip_lengths, indices_by_length, sorted_trip_lengths, all_signals = prepare_data(input_folder, pth_folder, MAX_FILES, MIN_SEQ_LENGTH, ROOT)
 
 # +
 # INPUT & TARGET SPECIFICATION ---------------------------------------------------
@@ -179,16 +180,11 @@ selection_3 = ["vehspd_cval_cpc", "altitude_cval_ippc", "airtempoutsd_cval_cpc",
 
 
 # +
-# FEATURE SELECTION  ----------------------------------------------------------------------------
+# FEATURE SELECTION & SCALING ----------------------------------------------------------------------------
 INPUT_COLUMNS = FEATURES; TARGET_COLUMN = TARGETS; PRIOR_COLUMN = PRIORS
 print(f"{'-'*60}\nInput Signals:\t{len(FEATURES)}\nTarget Signals:\t{len(TARGETS)}\nPhysical Prior Signals:\t{len(PRIORS)}\n{'-'*60}")
+scaler, target_scaler, prior_scaler = eval(SCALERS['feature_scaler']), eval(SCALERS['target_scaler']), eval(SCALERS['prior_scaler'])
 
-# FEATURE NORMALIZATION/SCALING -----------------------------------------------------------------
-scaler = eval(SCALERS['feature_scaler'])
-target_scaler = eval(SCALERS['target_scaler'])
-prior_scaler = eval(SCALERS['prior_scaler'])
-
-# +
 # DATA SET SPLITTING AND SORTING ----------------------------------------------------------------
 train_subset, val_subset, test_subset = random_split(files, TRAIN_VAL_TEST)
 
@@ -201,7 +197,7 @@ train_subset, train_dataset, train_dataset_batches, train_loader = prepare_datal
     BATCH_SIZE, INPUT_COLUMNS, TARGET_COLUMN, PRIOR_COLUMN, scaler, target_scaler, prior_scaler, dataloader_settings, fit=True, drop_last=True)
 
 val_subset, val_dataset, val_dataset_batches, val_loader = prepare_dataloader_PINN(val_subset, indices_by_length, \
-    BATCH_SIZE, INPUT_COLUMNS, TARGET_COLUMN, PRIOR_COLUMN, scaler, target_scaler, prior_scaler, dataloader_settings, drop_last=True)
+    BATCH_SIZE, INPUT_COLUMNS, TARGET_COLUMN, PRIOR_COLUMN, scaler, target_scaler, prior_scaler, dataloader_settings, drop_last=False)
 
 test_subset, test_dataset, test_dataset_batches, test_loader = prepare_dataloader_PINN(test_subset, indices_by_length, \
     BATCH_SIZE, INPUT_COLUMNS, TARGET_COLUMN, PRIOR_COLUMN, scaler, target_scaler, prior_scaler, dataloader_settings, drop_last=False)
@@ -209,17 +205,19 @@ test_subset, test_dataset, test_dataset_batches, test_loader = prepare_dataloade
 # print dataset info
 subset_files = print_dataset_sizes(train_dataset, val_dataset, test_dataset, train_subset, val_subset, test_subset, files)
 
-# +
-# Load dataloaders
+# -----------------------------------------------------------------------------------
+# Load dataloaders instead
 #train_loader = torch.load('train_loader.pth')
 #val_loader = torch.load('val_loader.pth')
 #test_loader = torch.load('test_loader.pth')
-# -
 
+# optional visualizations of padding preprocessing:
 if IS_NOTEBOOK and False: 
     check_batch_PINN(train_loader)
     visualize_padding(BATCH_SIZE, trip_lengths, sorted_trip_lengths, train_loader, val_loader, test_loader)
 
+
+# -
 
 # ___
 # MODEL & TRAINING CONFIGURATIONS
@@ -270,13 +268,10 @@ class LSTM1_packed_old_version(nn.Module):
 # -
 
 # ___
-# TRAINING
-
-# ___
 # OPTUNA: Hyperparameter Optimization
 
 # OPTUNA: OBJECTIVE ---------------------------------------------------
-def objective(trial):
+def objective(trial, LOSS_FN):
 
     # OPTUNA: CREATE TRIAL OBJECTS ---------------------------------------------------
     optuna_params = {}
@@ -293,112 +288,72 @@ def objective(trial):
     # TRAINING_CODE: -----------------------------------------------------------------
     # INSTANTIATE MODEL AND APPLY WEIGHT INITIALIZATION --------------------
     model = LSTM1_packed_old_version(len(INPUT_COLUMNS), HIDDEN_SIZE, NUM_LAYERS, DROPOUT).to(DEVICE)
-    model.initialize_weights_lstm(WEIGHT_INIT_TYPE); print_info(model)
+    model.initialize_weights_lstm(WEIGHT_INIT_TYPE)
+    #print_info(model)
     
+    # SET OPTIMIIZER, SCHEDULER AND LOSS MODULES ---------------------------
     if OPTIMIZER=='adam': optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     elif OPTIMIZER=='adamw': optimizer = torch.optim.AdamW(model.parameters(), lr = LEARNING_RATE, weight_decay = WEIGHT_DECAY)
     elif OPTIMIZER=='sgd': optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM_SGD, weight_decay=WEIGHT_DECAY)
 
+    def lr_lambda(epoch): return 1.0
     scheduler = eval(LRSCHEDULER); criterion = eval(CRITERION)
 
-    # LOSS FUNCTION ----------------------------------------------------------------   
-    def loss_fn_PINN_3(output, target, prior):
-        l_p = P_LOSS_FACTOR
-        y_pred = output; y_true = target; y_phys = prior
-        total_loss = F.mse_loss(y_true, (l_p * y_phys + (1 - l_p) * y_pred), reduction='mean')
-        return total_loss
-
     # TRAIN -----------------------------------------------------------------
-    TRAINER = PTrainer_PINN(model = model, optimizer = optimizer, scheduler = scheduler,
-     loss_fn = loss_fn_PINN_3, train_loader = train_loader, val_loader = val_loader, test_loader = test_loader, num_epochs = NUM_EPOCHS, device = DEVICE, is_notebook = IS_NOTEBOOK, 
-     use_mixed_precision = True)
+    TRAINER = PTrainer_PINN(
+        model = model, 
+        optimizer = optimizer, 
+        scheduler = scheduler,
+        loss_fn = LOSS_FN, 
+        train_loader = train_loader, 
+        val_loader = val_loader, 
+        test_loader = test_loader, 
+        num_epochs = NUM_EPOCHS, 
+        device = DEVICE, 
+        is_notebook = IS_NOTEBOOK, 
+        use_mixed_precision = MIXED_PRECISION, 
+        clip_value = CLIP_GRAD, 
+        log_file = Path(LOG_FILE_NAME).with_name(f"{TS}_Trial{trial.number}.txt"))
 
     RESULTS = TRAINER.train_model()
+
+    # PLOT RESULTS AND SAVE OPERATIONS ----------------------------------------------
+    print(f"Trial {trial.number}")
     plot_training_performance(RESULTS)
-
-    # RETURN latest val_loss ---------------------------------------------------------
+    
+    # TRAIN/VAL Loss:
     val_loss = RESULTS['val_losses'][-1]
+    train_loss = RESULTS['train_losses'][-1]
 
-    return val_loss
+    # EVALUATE -----------------------------------------------------------------
+    test_loss, all_outputs, all_targets, all_priors, all_original_lengths = TRAINER.evaluate_model()
+    # back-transform:
+    scaled_outputs = [target_scaler.inverse_transform(output_sequence.reshape(1, -1)).squeeze() for output_sequence in all_outputs]
+    scaled_targets = [target_scaler.inverse_transform(target_sequence.reshape(1, -1)).squeeze() for target_sequence in all_targets]
+    scaled_priors = [prior_scaler.inverse_transform(prior_sequence.reshape(1, -1)).squeeze() for prior_sequence in all_priors]
+    # concatenate:
+    all_y_true, all_y_pred, all_y_phys = np.concatenate(scaled_targets), np.concatenate(scaled_outputs), np.concatenate(scaled_priors)
+    # calculate evaluation metrics
+    print(f"Test Loss:\t\t{test_loss:.6f}")
+    metrics = calculate_metrics(all_y_true, all_y_pred) # [rmse, mae, std_dev, mape, r2, max_error]
+
+    rmse = metrics["rmse"]
+
+    return rmse
 
 
-# +
 # OPTUNA: STUDY -------------------------------------------------------------------
 study = optuna.create_study(direction='minimize', sampler = optuna.samplers.TPESampler())    # TPESampler, RandomSampler, GridSampler, CmaEsSampler, NSGAIISampler
-study.optimize(objective, n_trials=N_TRIALS)
-
-# Print the best hyperparameters
-print("Best hyperparameters: ", study.best_params)
-# -
+study.optimize(lambda trial: objective(trial, LOSS_FN), n_trials=N_TRIALS)
 
 # ___
 # SAVE CHECKPOINT
 
-# SAVE MODEL -----------------------------------------------------------------
-CHECKPOINT, model_destination_path = save_checkpoint(TRAINER, train_loader, val_loader, test_loader, RESULTS, CONFIG, subset_files, pth_folder)
-
-# ___
-# LOAD CHECKPOINT
-
-# +
-# model_destination_path = Path(pth_folder, "LSTM1_packed_old_version_241216_082030.pth")
-# -
-
-# LOAD MODEL -----------------------------------------------------------------
-CHECKPOINT = load_checkpoint(model_destination_path, DEVICE)
-for key in CHECKPOINT.keys(): globals()[key] = CHECKPOINT[key]
-# load model and optimizer states --------------------------------------------
-model.load_state_dict(model_state_dict)
-optimizer.load_state_dict(optimizer_state_dict)
-model.eval()  # set model to evaluation mode for inference
-
-# ___
-# EVALUATION
-
-# +
-# EVALUATION -----------------------------------------------------------------
-# get file list of test subset
-test_files = CHECKPOINT["test_files"]; print(f"{'-'*60}\nTest subset: {len(test_files)} files\n{'-'*60}")
-# -------------------------------------
-# evaluate model on test set
-test_loss, all_outputs, all_targets, all_priors, all_original_lengths = TRAINER.evaluate_model()
-# -------------------------------------
-# Inverse-transform on all outputs and targets for evaluation
-scaled_outputs = [target_scaler.inverse_transform(output_sequence.reshape(1, -1)).squeeze() for output_sequence in all_outputs]
-scaled_targets = [target_scaler.inverse_transform(target_sequence.reshape(1, -1)).squeeze() for target_sequence in all_targets]
-scaled_priors = [prior_scaler.inverse_transform(prior_sequence.reshape(1, -1)).squeeze() for prior_sequence in all_priors]
-
-# concatenate:
-all_y_true, all_y_pred, all_y_phys = np.concatenate(scaled_targets), np.concatenate(scaled_outputs), np.concatenate(scaled_priors)
-
-# calculate evaluation metrics
-print(f"Test Loss:\t\t{test_loss:.6f}")
-metrics = calculate_metrics(all_y_true, all_y_pred) # [rmse, mae, std_dev, mape, r2, max_error]
-# -
-
-# ___
-# PLOT RESULTS
-
-# +
-# get random sample sequence from test set
-sample_int = random.randint(1, len(test_files)-1)
-y_true, y_pred, y_phys = scaled_targets[sample_int], scaled_outputs[sample_int], scaled_priors[sample_int]
-
-###############################################
-# PLOT PREDICTION -----------------------------------------------------------------
-if PLOT_ACTIVE:
-     plt.figure(figsize=(18,4)); plt.xlabel('Time in s'); plt.ylabel('SOC in %'); plt.title('Battery State of Charge: Prediction vs. Actual Data') 
-     plt.plot(y_true, label='Actual Data') # actual plot
-     plt.plot(np.arange(0, len(y_true), 1), y_pred, label='Predicted Data') # predicted plot
-     plt.plot(y_phys, label='Physical Prior') # physical prior
-     plt.ylim(0, 100) # set y-axis limits
-
-     plt.legend()
-     plt.text(0.01, 0.02, f"RMSE: {root_mean_squared_error(y_true, y_pred):.4f}\nStd Dev: {np.std(y_true - y_pred):.4f}\nModel ID: {model_name_id}",\
-          transform=plt.gca().transAxes, fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
-
-     plt.figure(figsize=(18,4)); plt.xlabel('Time in s'); plt.ylabel('SOC in %')
-     plt.plot(savgol_filter(y_true.flatten(), window_length=60, polyorder=3), label='Actual Data (Smoothed)') # actual plot
-     plt.plot(np.arange(0, len(y_true), 1), savgol_filter(y_pred.flatten(), window_length=60, polyorder=3), label='Predicted Data (Smoothed)') # predicted plot
-     plt.ylim(0, 100) # set y-axis limits
-     plt.legend();
+# Save the best trial config to a text file
+best_trial = study.best_trial
+best_trial_dict = {'params': best_trial.params, 'value': best_trial.value}
+with open(Path(LOG_FILE_NAME).with_name(f"{TS}_BEST_IS_{best_trial.number}.txt"), 'w') as f: json.dump(best_trial_dict, f, indent=4)
+print("Best Trial: ", best_trial.number); print("Best hyperparameters: ", study.best_params)
+trials_df = study.trials_dataframe()
+print(tabulate(trials_df, headers='keys', tablefmt='psql'))
+trials_df.to_csv('trials_overview.csv', index=False)

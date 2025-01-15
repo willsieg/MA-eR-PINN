@@ -157,9 +157,30 @@ def calculate_metrics(y_true, y_pred):
         }
 
     print(f"RMSE:\t\t\t{metrics['rmse']:.4f}\
-        \nMAE ± STD (MAPE):\t{metrics['mae']:.4f} ± {metrics['std_dev']:.4f} ({metrics['mape']:.2f}%)\nR-squared:\t\t{metrics['r2']:.4f}")
+        \nMAE ± STD (MAPE):\t{metrics['mae']:.4f} ± {metrics['std_dev']:.4f} ({metrics['mape']:.2f}%)\nR-squared:\t\t{metrics['r2']:.4f}\n{'-'*60}")
     
     return metrics
+
+def calculate_metrics_per_sequence(scaled_targets, scaled_outputs):
+    all_metrics = []
+
+    for y_true, y_pred in zip(scaled_targets, scaled_outputs):
+        metrics = {
+            "rmse": root_mean_squared_error(y_true, y_pred),                  # Root Mean Squared Error
+            "mae": np.mean(np.abs(y_true - y_pred)),                          # Mean Absolute Error
+            "std_dev": np.std(y_true - y_pred),                               # Standard Deviation
+            "mape": np.mean(np.abs((y_true - y_pred) / y_true)) * 100,        # Mean Absolute Percentage Error
+            "r2": r2_score(y_true, y_pred),                                   # R-squared
+            "max_error": np.max(np.abs(y_true - y_pred))                      # Maximum Error
+            }
+        all_metrics.append(metrics)
+
+    mean_metrics = {key: np.mean([m[key] for m in all_metrics]) for key in all_metrics[0]}
+
+    print(f"RMSE:\t\t\t{mean_metrics['rmse']:.4f}\
+        \nMAE ± STD (MAPE):\t{mean_metrics['mae']:.4f} ± {mean_metrics['std_dev']:.4f} ({mean_metrics['mape']:.2f}%)\nR-squared:\t\t{mean_metrics['r2']:.4f}\n{'-'*60}")
+    
+    return mean_metrics
 
 '''
 # RESHAPE EVALUATION OUTPUTS (NOT REQUIRED)------------------------------------------------------

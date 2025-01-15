@@ -71,5 +71,5 @@ def print_dataset_sizes(train_dataset, val_dataset, test_dataset, train_subset, 
         "test_files": list(test_dataset.file_list)
     }
     
-    print(f"first 3 train files: {[os.path.basename(_) for _ in subset_files['train_files'][:3]]}")
+    #print(f"first 3 train files: {[os.path.basename(_) for _ in subset_files['train_files'][:3]]}")
     return subset_files

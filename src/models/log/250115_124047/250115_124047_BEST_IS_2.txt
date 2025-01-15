@@ -1,0 +1,17 @@
+{
+    "params": {
+        "HIDDEN_SIZE": 13,
+        "NUM_LAYERS": 6,
+        "DROPOUT": 0.25,
+        "CLIP_GRAD": 1.5,
+        "WEIGHT_INIT_TYPE": "normal",
+        "OPTIMIZER": "adam",
+        "NUM_EPOCHS": 9,
+        "LEARNING_RATE": 1e-05,
+        "WEIGHT_DECAY": 0.001,
+        "MOMENTUM_SGD": 0.7000000000000001,
+        "CRITERION": "nn.HuberLoss()",
+        "P_LOSS_FACTOR": 0.8
+    },
+    "value": 0.06013660555084546
+}
