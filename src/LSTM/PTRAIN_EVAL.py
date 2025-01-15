@@ -12,14 +12,12 @@
 #     name: python3
 # ---
 
-
-
 # #%reset -f -s
 # %matplotlib inline
 '''------------------------------------------------------------------
 MA-eR-PINN: eRange Prediction using Physics-Informed Neural Networks
 ---------------------------------------------------------------------
-Version: V2.0      Modified: 12.01.2025        William Siegle
+Version: V2.1      Modified: 14.01.2025        William Siegle
 ---------------------------------------------------------------------
 PTRAIN - Standard Pipeline Framework for Training the PINN
 + OPTUNA - Hyperparameter Optimization using Optuna
@@ -30,14 +28,14 @@ from pathlib import Path
 CONFIG = {
     # SYSTEM: ---------------------------------------------------------------------
     "GPU_SELECT":       0, # {0,1,2,3, None: CPU only}
-    "ROOT":             Path('.').resolve(),
+    "ROOT":             Path('../..').resolve(),
     "INPUT_LOCATION":   Path("TripSequences", "trips_processed_pinn_2"), 
     "OUTPUT_LOCATION":  Path("src", "models", "pth"),
     "SEED"  :           23,
     "PLOT_ACTIVE":      True,
 
     # DATA PREPROCESSING: ---------------------------------------------------------
-    "TRAIN_VAL_TEST":   [0.8, 0.19, 0.01], # [train, val, test splits]
+    "TRAIN_VAL_TEST":   [0.8, 0.18, 0.02], # [train, val, test splits]
     "MAX_FILES":        None, # None: all files
     "MIN_SEQ_LENGTH":   5400, # minimum sequence length in s to be included in DataSets
     "SCALERS":          {'feature_scaler': 'StandardScaler()','target_scaler': 'StandardScaler()','prior_scaler': 'StandardScaler()'},
@@ -55,24 +53,24 @@ CONFIG = {
 
     # MODEL: -----------------------------------------------------------------------
     "HIDDEN_SIZE":      12,    # features in the hidden state h
-    "NUM_LAYERS":       2,      # recurrent layers for stacked LSTMs. Default: 1
+    "NUM_LAYERS":       4,      # recurrent layers for stacked LSTMs. Default: 1
     "DROPOUT":          0.3,   # usually: [0.2 - 0.5]
     
     # TRAINING & OPTIMIZER: --------------------------------------------------------
     "NUM_EPOCHS":       2,
     "BATCH_SIZE":       32,         # [2, 4, 8, 16, 32, 64, 128, 256]
-    "LEARNING_RATE":    2.5e-4,     # 0.001 lr
+    "LEARNING_RATE":    2.8e-4,       # 0.001 lr
     "WEIGHT_DECAY":     1e-4,       # weight decay coefficient (default: 1e-2)
     "MOMENTUM_SGD":     0.1,        # (default: 0.0)
     "OPTIMIZER":        'adamw',    # ('adam', 'sgd', 'adamw')
     "WEIGHT_INIT_TYPE": 'normal',  # ('he', 'normal', 'default')
-    "CLIP_GRAD":        0.5,        # default: None
+    "CLIP_GRAD":        1.0,        # default: None
     "LRSCHEDULER":      "torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)",  # constant LR for 1.0 as multiplicative factor
 
     # LOSS FUNCTION: ---------------------------------------------------------------
     "CRITERION":        "nn.SmoothL1Loss()", # ['nn.MSELoss()', 'nn.L1Loss()', 'nn.SmoothL1Loss()', 'nn.HuberLoss()', 'MASE()']
     "LOSS_FN":          "F.mse_loss(output, target)", # ['F.mse_loss(output, target)', 'F.l1_loss(output, target)', 'F.smooth_l1_loss(output, target)', 'F.huber_loss(output, target)', 'F.mase_loss(output, target)']
-    "P_LOSS_FACTOR":    0.0, # Physics loss factor
+    "P_LOSS_FACTOR":    0.2, # Physics loss factor
 }
 
 
@@ -104,15 +102,11 @@ from src.utils.Trainers import *
 from src.models.lstm_models import *
 
 # SETUP ENVIRONMENT ---------------------------------------------------------------------
-DATA_PATH, IS_NOTEBOOK, DEVICE = setup_environment(CONFIG, ROOT, SEED, GPU_SELECT)
+DATA_PATH, IS_NOTEBOOK, DEVICE, LOG_FILE_NAME, TS = setup_environment(CONFIG, ROOT, SEED, GPU_SELECT)
 
-LOG_FILE_NAME, TS = generate_log_file_name(__file__)
-output_file = open(LOG_FILE_NAME, "w")
-sys.stdout = Tee(sys.stdout, output_file); sys.stderr = Tee(sys.stderr, output_file)
-
-
-
-
+if not IS_NOTEBOOK:
+    output_file = open(f"{LOG_FILE_NAME}", "w")
+    sys.stdout = Tee(sys.stdout, output_file); sys.stderr = Tee(sys.stderr, output_file)
 # -
 
 # ___
@@ -237,7 +231,7 @@ class LSTM1_packed_old_version(nn.Module):
         for name, param in self.named_parameters():
             if 'weight_ih' in name or 'weight_hh' in name:
                 if init_type == 'he': nn.init.kaiming_uniform_(param.data, nonlinearity='relu')     # HE INIT
-                elif init_type == 'normal': nn.init.normal_(param.data, mean=0.0, std=0.02)         # NORMAL INIT
+                elif init_type == 'normal': nn.init.normal_(param.data, mean=0.0, std=0.05)         # NORMAL INIT
                 elif init_type == 'default': continue                                               # TORCH DEFAULT INIT
             elif 'bias' in name and init_type != 'default': nn.init.constant_(param.data, 0)
 
@@ -274,7 +268,7 @@ def loss_fn_PINN_3(output, target, prior):
 # TRAIN -----------------------------------------------------------------
 TRAINER = PTrainer_PINN(model = model, optimizer = optimizer, scheduler = scheduler,
     loss_fn = loss_fn_PINN_3, train_loader = train_loader, val_loader = val_loader, test_loader = test_loader, num_epochs = NUM_EPOCHS, device = DEVICE, is_notebook = IS_NOTEBOOK, 
-    use_mixed_precision = True, clip_value = CLIP_GRAD)
+    use_mixed_precision = True, clip_value = CLIP_GRAD, log_file = LOG_FILE_NAME)
 
 RESULTS = TRAINER.train_model()
 plot_training_performance(RESULTS)
@@ -289,7 +283,7 @@ val_loss = RESULTS['val_losses'][-1]
 # SAVE CHECKPOINT
 
 # SAVE MODEL -----------------------------------------------------------------
-CHECKPOINT, model_destination_path = save_checkpoint(TRAINER, train_loader, val_loader, test_loader, RESULTS, CONFIG, subset_files, pth_folder)
+CHECKPOINT, model_destination_path = save_checkpoint(TRAINER, train_loader, val_loader, test_loader, RESULTS, CONFIG, subset_files, pth_folder, TS)
 
 # ___
 # LOAD CHECKPOINT
@@ -328,6 +322,8 @@ all_y_true, all_y_pred, all_y_phys = np.concatenate(scaled_targets), np.concaten
 # calculate evaluation metrics
 print(f"Test Loss:\t\t{test_loss:.6f}")
 metrics = calculate_metrics(all_y_true, all_y_pred) # [rmse, mae, std_dev, mape, r2, max_error]
+
+# Variante auschecken!
 # -
 
 # ___
@@ -356,5 +352,6 @@ if PLOT_ACTIVE:
      plt.plot(np.arange(0, len(y_true), 1), savgol_filter(y_pred.flatten(), window_length=60, polyorder=3), label='Predicted Data (Smoothed)') # predicted plot
      plt.ylim(0, 100) # set y-axis limits
      plt.legend();
+# -
 
-sys.stdout.close(); sys.stderr.close()
+if not IS_NOTEBOOK: sys.stdout.close(); sys.stderr.close()

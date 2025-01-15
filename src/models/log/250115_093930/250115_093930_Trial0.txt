@@ -1,31 +1,23 @@
 ------------------------------------------------------------
-Training Started.	Process ID: 1945852 
+Training Started.	Process ID: 2156958 
 ------------------------------------------------------------
 Model: LSTM1_packed_old_version	Parameters on device: CUDA:0
 ------------------------------------------------------------
 Train/Batch size:	63 / 63
-Loss:			<function loss_fn_PINN_3 at 0x7f076d33c9a0>
-Optimizer:		AdamW
-LR:			0.00028
-Weight Decay:		0.0001
+Loss:			<function objective.<locals>.loss_fn_PINN_3 at 0x7f380c495800>
+Optimizer:		Adam
+LR:			1e-05
+Weight Decay:		0.01
 ------------------------------------------------------------
 
 ------------------------------------------------------------
 Epoch         Iteration     Batch Loss      Train Loss    
 ------------------------------------------------------------
-1             1             0.741790
-1             63            0.504450		0.612032
+1             1             0.175434
+1             63            0.206513		0.187232
 
-Val           Validation Loss:				0.636519
-
+Val           Validation Loss:				0.168933
 ------------------------------------------------------------
-Epoch         Iteration     Batch Loss      Train Loss    
-------------------------------------------------------------
-2             1             0.620699
-2             63            0.248505		0.443595
-
-Val           Validation Loss:				0.244073
-------------------------------------------------------------
-Training Completed.	Execution Time: 00:01:32
+Training Completed.	Execution Time: 00:01:29
 ------------------------------------------------------------
 

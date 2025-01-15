@@ -41,8 +41,8 @@ def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, 
     torch.save(checkpoint, model_destination_path, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
     # Check saved object size
-    print(f"Model saved to:\t {model_destination_path}\n{'-'*60}\nModel ID: {model_name_id}\n{'-'*60}\nSize: {os.path.getsize(model_destination_path) / 1024**2:.2f} MB\n{'-'*60}")
-    print(f"log_file: checkpoint['log_file']")
+    print(f"Model saved to:\t {os.path.basename(model_destination_path)}\n{'-'*60}\nModel ID: {model_name_id}\n{'-'*60}\nSize: {os.path.getsize(model_destination_path) / 1024**2:.2f} MB\n{'-'*60}")
+    print(f"log_file: {checkpoint['log_file']}")
     if os.path.getsize(model_destination_path) > 100 * 1024**2: 
         print("--> Warning: saved model size exceeds 100MB! Creating a zip file instead ...")
         try:
@@ -109,7 +109,7 @@ def plot_training_performance(results):
         transform=ax1.transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
 
     # Add the log file name to the plot
-    fig.text(0.01, 0.01, f"Log: {os.path.basename(log_file)}", fontsize=8, color='gray', alpha=0.7)
+    fig.text(0.01, 0.01, f" {os.path.basename(log_file).strip('_log.txt')}", fontsize=8, color='gray', alpha=0.7)
 
     if pd.Series(lr_history).nunique() > 1:
         ax2 = ax1.twinx()

@@ -2,6 +2,7 @@ from pathlib import Path, WindowsPath, PosixPath
 import math, time, random, pickle, sys, os
 import numpy as np
 import pandas as pd
+import json
 
 import matplotlib.pyplot as plt; plt.style.use('ggplot')
 import pyarrow.parquet as pq
@@ -80,8 +81,10 @@ def setup_environment(CONFIG, ROOT, SEED, GPU_SELECT):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(SEED)
 
-    LOG_FILE_NAME, TS = generate_log_file_name(Path(ROOT, 'src', 'models', 'log'))
-
+    TS = datetime.now().strftime('%y%m%d_%H%M%S')
+    log_folder = Path(ROOT, 'src', 'models', 'log', f"{TS}")
+    log_folder.mkdir(parents=True, exist_ok=True)
+    LOG_FILE_NAME = generate_log_file_name(log_folder, TS)
     print(f"Timestamp: {TS}")
 
     return DATA_PATH, IS_NOTEBOOK, DEVICE, LOG_FILE_NAME, TS 
@@ -98,8 +101,6 @@ class Tee:
         for f in self.files: 
             if f not in (sys.stdout, sys.stderr): f.close()
 
-def generate_log_file_name(dir):
-    timestamp = datetime.now().strftime('%y%m%d_%H%M%S')
+def generate_log_file_name(dir, timestamp):
     log_file_name = f"{timestamp}.txt"
-
-    return os.path.join(dir, log_file_name), timestamp
+    return os.path.join(dir, log_file_name)
