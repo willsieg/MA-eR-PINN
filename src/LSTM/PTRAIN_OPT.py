@@ -31,13 +31,13 @@ CONFIG = {
     "ROOT":             Path('../..').resolve(),
     "INPUT_LOCATION":   Path("TripSequences", "trips_processed_pinn_2"), 
     "OUTPUT_LOCATION":  Path("src", "models", "pth"),
-    "SEED"  :           20,
+    "SEED"  :           19,
     "MIXED_PRECISION":  True,
 
     # DATA PREPROCESSING: ---------------------------------------------------------
     "TRAIN_VAL_TEST":   [0.8, 0.1, 0.1], # [train, val, test splits]
     "MAX_FILES":        None, # None: all files
-    "MIN_SEQ_LENGTH":   3600, # minimum sequence length in s to be included in DataSets
+    "MIN_SEQ_LENGTH":   1800, # minimum sequence length in s to be included in DataSets
     "SCALERS":          {'feature_scaler': 'MinMaxScaler()','target_scaler': 'MinMaxScaler()','prior_scaler': 'MinMaxScaler()'},
 
     # FEATURES: -------------------------------------------------------------------
@@ -58,7 +58,7 @@ CONFIG = {
     
     # TRAINING & OPTIMIZER: --------------------------------------------------------
     "NUM_EPOCHS":       10,
-    "BATCH_SIZE":       32,         # [2, 4, 8, 16, 32, 64, 128, 256]
+    "BATCH_SIZE":       128,        # [2, 4, 8, 16, 32, 64, 128, 256]
     "LEARNING_RATE":    1e-3,       # 0.001 lr
     "WEIGHT_DECAY":     1e-3,       # weight decay coefficient (default: 1e-2)
     "MOMENTUM_SGD":     0.1,        # (default: 0.0)
@@ -70,28 +70,28 @@ CONFIG = {
 
     # LOSS FUNCTION: ---------------------------------------------------------------
     "CRITERION":        "nn.SmoothL1Loss()", # ['nn.MSELoss()', 'nn.L1Loss()', 'nn.SmoothL1Loss()', 'nn.HuberLoss()', 'MASE()']
-    "P_LOSS_FACTOR":    0.5, # Physics loss factor
+    "P_LOSS_FACTOR":    0.0, # Physics loss factor
 }
 
 # +
 # OPTUNA: SEARCH SPACE ---------------------------------------------------
-N_TRIALS = 50
+N_TRIALS = 100
 
 global search_space, search_space_NewData
 search_space = {
     # MODEL: -----------------------------------------------------------------------
     'HIDDEN_SIZE': ('int', 10, 100, 10),
-    'NUM_LAYERS': ('int', 1, 5, 1),
+    'NUM_LAYERS': ('int', 1, 10, 1),
     'DROPOUT': ('float', 0.0, 0.6, 0.05),
-    'CLIP_GRAD': ('categorical', (None, 0.01, 0.1, 0.5, 1.0, 1.5, 2.0, 5.0)),
+    'CLIP_GRAD': ('categorical', (None, 0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0)),
     'WEIGHT_INIT_TYPE': ('categorical', ('he', 'normal', 'default')),
 
     # TRAINING & OPTIMIZER: --------------------------------------------------------
-    'OPTIMIZER': ('categorical', ('adam', 'adamw')),
-    #'NUM_EPOCHS': ('int', 5, 10, 1),
+    'OPTIMIZER': ('categorical', ('adam', 'adamw','sgd')),
+    'NUM_EPOCHS': ('int', 5, 20, 1),
     'LEARNING_RATE': ('categorical', (5e-5, 1e-4, 3e-4, 5e-4, 8e-4, 1e-3, 3e-3, 5e-3, 8e-3, 1e-2, 2e-2, 5e-2)),
     'WEIGHT_DECAY': ('categorical', (0.0, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2)),
-    #'MOMENTUM_SGD': ('float', 0.0, 0.9, 0.1),
+    'MOMENTUM_SGD': ('float', 0.0, 0.9, 0.1),
 
     #'P_LOSS_FACTOR': ('float', 0.05, 1.0, 0.05)
 }
@@ -337,14 +337,20 @@ def objective(trial, LOSS_FN):
     print(f"Test Loss:\t\t{test_loss:.6f}")
     metrics = calculate_metrics(all_y_true, all_y_pred) # [rmse, mae, std_dev, mape, r2, max_error]
 
-    rmse = metrics["rmse"]
+    rmse = metrics["rmse"]; trial.set_user_attr("rmse", rmse)
+    mae = metrics["mae"]; trial.set_user_attr("mae", metrics["mae"])
+    std = metrics["std_dev"]; trial.set_user_attr("std_dev", metrics["std_dev"])
+    mape = metrics["mape"]; trial.set_user_attr("mape", metrics["mape"])
 
     return rmse
 
 
 # OPTUNA: STUDY -------------------------------------------------------------------
-study = optuna.create_study(direction='minimize', sampler = optuna.samplers.TPESampler())    # TPESampler, RandomSampler, GridSampler, CmaEsSampler, NSGAIISampler
+study = optuna.create_study(direction='minimize', sampler = optuna.samplers.RandomSampler())    # TPESampler, RandomSampler, GridSampler, CmaEsSampler, NSGAIISampler
 study.optimize(lambda trial: objective(trial, LOSS_FN), n_trials=N_TRIALS)
+
+for trial in study.trials:
+    print(f"Trial {trial.number}: Value: {trial.value}, RMSE: {trial.user_attrs['rmse']}, MAE: {trial.user_attrs['mae']}, STD_dev: {trial.user_attrs['std_dev']}, MAPE: {trial.user_attrs['mape']}")
 
 # ___
 # SAVE CHECKPOINT
@@ -356,4 +362,4 @@ with open(Path(LOG_FILE_NAME).with_name(f"{TS}_BEST_IS_{best_trial.number}.txt")
 print("Best Trial: ", best_trial.number); print("Best hyperparameters: ", study.best_params)
 trials_df = study.trials_dataframe()
 print(tabulate(trials_df, headers='keys', tablefmt='psql'))
-trials_df.to_csv('trials_overview.csv', index=False)
+trials_df.to_csv(Path(LOG_FILE_NAME).with_name(f"trials_overview.csv"), index=False)
