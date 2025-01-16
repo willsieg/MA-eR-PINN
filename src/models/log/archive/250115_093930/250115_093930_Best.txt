@@ -1,0 +1,17 @@
+{
+    "params": {
+        "HIDDEN_SIZE": 11,
+        "NUM_LAYERS": 2,
+        "DROPOUT": 0.15000000000000002,
+        "CLIP_GRAD": 1.5,
+        "WEIGHT_INIT_TYPE": "default",
+        "OPTIMIZER": "adam",
+        "NUM_EPOCHS": 2,
+        "LEARNING_RATE": 0.0005,
+        "WEIGHT_DECAY": 1e-05,
+        "MOMENTUM_SGD": 0.2,
+        "CRITERION": "nn.MSELoss()",
+        "P_LOSS_FACTOR": 0.7500000000000001
+    },
+    "value": 0.04123067756493886
+}

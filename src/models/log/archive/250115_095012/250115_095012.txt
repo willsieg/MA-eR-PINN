@@ -1,0 +1,88 @@
+------------------------------------------------------------
+Total Files:	16116
+Filtered Files:	2536
+------------------------------------------------------------
+               FileName  Length  Index
+0       V13_T25.parquet   20843   1478
+1      V18_T775.parquet   19425   1930
+2      V13_T352.parquet   18308   1383
+3      V18_T972.parquet   17858   2011
+4     V16_T1629.parquet   17519   1750
+...                 ...     ...    ...
+2531   V13_T286.parquet    5408   1675
+2532   V12_T852.parquet    5407   1722
+2533   V13_T114.parquet    5407   2397
+2534   V13_T736.parquet    5406   2276
+2535   V14_T952.parquet    5401   2505
+
+[2536 rows x 3 columns]
+------------------------------------------------------------
+Input Signals:	37
+Target Signals:	1
+Physical Prior Signals:	1
+------------------------------------------------------------
+ --> Warning: Removed the last 13 samples to ensure a balanced batch size
+fitting Scalers: StandardScaler, StandardScaler, StandardScaler
+	50% of the fitting done...
+Done. Create DataSets and DataLoaders...
+	Number of batches created: 63
+ --> Warning: Removed the last 2 samples to ensure a balanced batch size
+	Number of batches created: 15
+	Number of batches created: 1
+------------------------------------------------------------
+Train size:  17402267		(Files: 2016)
+Val. size:   4172776		(Files: 480)
+Test size:   213309		(Files: 25) 
+ ------------------------------------------------------------
+	Removed 15 file from the dataset
+------------------------------------------------------------
+first 3 train files: ['V13_T25.parquet', 'V18_T775.parquet', 'V13_T352.parquet']
+Trial 0
+------------------------------------------------------------
+Training Started.	Process ID: 2160316 
+------------------------------------------------------------
+Model: LSTM1_packed_old_version	Parameters on device: CUDA:0
+------------------------------------------------------------
+Train/Batch size:	63 / 63
+Loss:			<function objective.<locals>.loss_fn_PINN_3 at 0x7fee2dd179c0>
+Optimizer:		SGD
+LR:			1e-05
+Weight Decay:		0.0
+------------------------------------------------------------
+------------------------------------------------------------
+Training Completed.	Execution Time: 00:02:15
+------------------------------------------------------------
+
+Trial 1
+------------------------------------------------------------
+Training Started.	Process ID: 2160316 
+------------------------------------------------------------
+Model: LSTM1_packed_old_version	Parameters on device: CUDA:0
+------------------------------------------------------------
+Train/Batch size:	63 / 63
+Loss:			<function objective.<locals>.loss_fn_PINN_3 at 0x7feffa0d77e0>
+Optimizer:		SGD
+LR:			1e-05
+Weight Decay:		0.0
+------------------------------------------------------------
+------------------------------------------------------------
+Training Completed.	Execution Time: 00:02:32
+------------------------------------------------------------
+
+Trial 2
+------------------------------------------------------------
+Training Started.	Process ID: 2160316 
+------------------------------------------------------------
+Model: LSTM1_packed_old_version	Parameters on device: CUDA:0
+------------------------------------------------------------
+Train/Batch size:	63 / 63
+Loss:			<function objective.<locals>.loss_fn_PINN_3 at 0x7feff549b380>
+Optimizer:		AdamW
+LR:			0.0001
+Weight Decay:		0.001
+------------------------------------------------------------
+------------------------------------------------------------
+Training Completed.	Execution Time: 00:01:30
+------------------------------------------------------------
+
+Best hyperparameters:  {'HIDDEN_SIZE': 5, 'NUM_LAYERS': 8, 'DROPOUT': 0.2, 'CLIP_GRAD': 1.0, 'WEIGHT_INIT_TYPE': 'he', 'OPTIMIZER': 'adamw', 'NUM_EPOCHS': 1, 'LEARNING_RATE': 0.0001, 'WEIGHT_DECAY': 0.001, 'MOMENTUM_SGD': 0.0, 'CRITERION': 'nn.L1Loss()', 'P_LOSS_FACTOR': 0.9500000000000001}
