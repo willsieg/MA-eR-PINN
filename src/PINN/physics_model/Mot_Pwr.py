@@ -96,15 +96,15 @@ def estimate_mot_pwr(speed,                 # v(t): [m/s]
      | P_mech [kW]   | recup_eff [%]   |
      |---------------|-----------------|
      | 0 ... -250    | 100 %           |
-     | -250 ... -350 | 90 %            |
-     | -350 ... -450 | 75 %            |
-     | < -450        | 50 %            |
+     | -250 ... -350 | 95 %            |
+     | -350 ... -450 | 85 %            |
+     | < -450        | 75 %            |
 
     Alternatively, apply a constant additional conversion factor for recuperational motor operation:
     eta_recup = 0.85    # 85% efficiency for recuperation
 
     '''
-    recup_eff = 1 - ((P_mech < -250) * 0.1) - ((P_mech < -350) * 0.15)- ((P_mech < -450) * 0.25)
+    recup_eff = 1 - ((P_mech < -250) * 0.05) - ((P_mech < -350) * 0.1)- ((P_mech < -450) * 0.1)
 
     # deactivate:
     P_el = recup_eff * P_el

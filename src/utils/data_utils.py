@@ -110,8 +110,8 @@ class TripDataset_PINN(Dataset):
                 self.scaler.partial_fit(X)
                 self.target_scaler.partial_fit(y)
 
-                # IMPORTANT: Scale the prior scaler on target values, so it is identical to the target scaler!!
-                self.prior_scaler.partial_fit(y)   
+                # IMPORTANT: Scale the prior scaler on target values, so it is identical to the target scaler --> y/n ? --> no
+                self.prior_scaler.partial_fit(p)   
             
                 # Print status info at 50%
                 if i == num_files // 2: print(f"\t50% of the fitting done...")

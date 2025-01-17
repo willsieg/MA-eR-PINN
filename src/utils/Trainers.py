@@ -20,8 +20,8 @@ class PTrainer_PINN():
     def __init__(self, model: nn.Module, optimizer: torch.optim.Optimizer, loss_fn: nn.Module, 
                  train_loader: DataLoader, num_epochs: int, device: torch.device, 
                  is_notebook: bool = False, val_loader: DataLoader = None, test_loader: DataLoader = None, 
-                 scheduler: torch.optim.lr_scheduler._LRScheduler = None, state: dict = None, 
-                 use_mixed_precision: bool = False, clip_value = None, log_file = "latest_run.txt"):
+                 lr_scheduler: torch.optim.lr_scheduler._LRScheduler = None, l_p_scheduler = None,
+                 state: dict = None, use_mixed_precision: bool = False, clip_value = None, log_file = "latest_run.txt"):
 
         self.model = model
         self.optimizer = optimizer
@@ -32,7 +32,9 @@ class PTrainer_PINN():
         self.is_notebook = is_notebook
         self.val_loader = val_loader
         self.test_loader = test_loader
-        self.scheduler = scheduler
+        self.lr_scheduler = lr_scheduler
+        self.l_p_scheduler = l_p_scheduler
+        self.l_p = None
         self.state = state
         self.use_mixed_precision = use_mixed_precision if torch.cuda.is_available() else False
         if self.use_mixed_precision: self.scaler = GradScaler('cuda')  # Initialize GradScaler
@@ -69,7 +71,7 @@ class PTrainer_PINN():
                             outputs_masked = outputs[mask]
                             targets_masked = targets[mask]
                             priors_masked = priors[mask]
-                            loss = self.loss_fn_pinn(outputs_masked.squeeze(), targets_masked, priors_masked)
+                            loss = self.loss_fn_pinn(outputs_masked.squeeze(), targets_masked, priors_masked, self.l_p)
                             test_loss += loss.item()
                     else:
                         outputs = self.model(inputs)  # inputs are packed, outputs are not ! --> see forward method in model
@@ -78,7 +80,7 @@ class PTrainer_PINN():
                         outputs_masked = outputs[mask]
                         targets_masked = targets[mask]
                         priors_masked = priors[mask]
-                        loss = self.loss_fn_pinn(outputs_masked.squeeze(), targets_masked, priors_masked)
+                        loss = self.loss_fn_pinn(outputs_masked.squeeze(), targets_masked, priors_masked, self.l_p)
                         test_loss += loss.item()
                     # -------------------------------------
                     # Detach tensors from the computation graph and move them to CPU
@@ -117,7 +119,7 @@ class PTrainer_PINN():
                             outputs = outputs[mask]
                             targets = targets[mask]
                             priors = priors[mask]
-                            loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors)
+                            loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
                             val_loss += loss.item()
                     else:
                         outputs = self.model(inputs)  # inputs are packed, outputs are not ! --> see forward method in model
@@ -126,14 +128,14 @@ class PTrainer_PINN():
                         outputs = outputs[mask]
                         targets = targets[mask]
                         priors = priors[mask]
-                        loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors)
+                        loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
                         val_loss += loss.item()
             # -------------------------------------          
             val_loss /= len(self.val_loader)  # Calculate average validation loss
-            if self.scheduler:
-                lr1 = self.scheduler.get_last_lr()[0]
-                self.scheduler.step()  # Adjust learning rate based on validation loss
-                lr2 = self.scheduler.get_last_lr()[0]
+            if self.lr_scheduler:
+                lr1 = self.lr_scheduler.get_last_lr()[0]
+                self.lr_scheduler.step()  # Adjust learning rate based on validation loss
+                lr2 = self.lr_scheduler.get_last_lr()[0]
                 self.lr_history.append(lr2)
                 if lr1 != lr2: self.print_and_log(f"Learning rate updated after epoch {epoch}: {lr1} -> {lr2}")
             return val_loss
@@ -156,6 +158,7 @@ class PTrainer_PINN():
             self.train_losses = self.state['train_losses']
             self.train_losses_per_iter = self.state['train_losses_per_iter']
             self.lr_history = self.state['lr_history']
+            self.l_p_history = self.state['l_p_history']
             self.val_losses = self.state['val_losses']
             self.training_table = self.state['training_table']
             start_epoch = self.state['epoch'] + 1
@@ -165,6 +168,7 @@ class PTrainer_PINN():
             self.val_losses = []  
             self.training_table = []  
             self.lr_history = []
+            self.l_p_history = []
             if self.is_notebook: display_html(HTML(initialize_table()))
 
         # TRAINING LOOP:
@@ -197,7 +201,10 @@ class PTrainer_PINN():
                             outputs = outputs[mask]
                             targets = targets[mask]
                             priors = priors[mask]
-                            loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors)
+                            self.l_p = self.l_p_scheduler.get_value((epoch-1)*num_iterations + iter)
+                            self.l_p_history.append(self.l_p)
+                            loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
+                            
 
                         self.scaler.scale(loss).backward()  # Scale the loss and perform backward pass
                         if self.clip_value is not None:
@@ -216,7 +223,9 @@ class PTrainer_PINN():
                         targets = targets[mask]
                         priors = priors[mask]
                         # -------------------------------------
-                        loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors)
+                        self.l_p = self.l_p_scheduler.get_value((epoch-1)*num_iterations + iter)
+                        self.l_p_history.append(self.l_p)
+                        loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
                         loss.backward()
                         if self.clip_value is not None:
                             nn.utils.clip_grad_value_(self.model.parameters(), clip_value=self.clip_value)  # optional: Gradient Value Clipping
@@ -283,6 +292,7 @@ class PTrainer_PINN():
             "train_losses_per_iter": list(self.train_losses_per_iter),
             "val_losses": self.val_losses,
             'lr_history': self.lr_history,
+            'l_p_history': self.l_p_history,
             
             # settings and meta data
             "loss_fn": self.loss_fn_pinn,

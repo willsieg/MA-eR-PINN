@@ -15,7 +15,7 @@ from tabulate import tabulate
 def save_checkpoint(trainer, train_loader, val_loader, test_loader, checkpoint, config, subset_files, pth_folder, timestamp) -> tuple:
 
     # Collecting results and meta data for saving dict
-    trainer_add_info = {key: getattr(trainer, key) for key in ['model', 'optimizer', 'scheduler', 'state', 'clip_value', 'device', 'use_mixed_precision']}
+    trainer_add_info = {key: getattr(trainer, key) for key in ['model', 'optimizer', 'lr_scheduler', 'l_p_scheduler', 'state', 'clip_value', 'device', 'use_mixed_precision']}
     loader_sizes = {'train_batches': len(train_loader), 'val_batches': len(val_loader), 'test_batches': len(test_loader)}
     checkpoint['CONFIG'] = config
     checkpoint = {**checkpoint, **trainer_add_info, **subset_files, **loader_sizes}
@@ -89,6 +89,7 @@ def plot_training_performance(results):
     train_losses_per_iter = results['train_losses_per_iter']
     train_losses, val_losses = results['train_losses'], results['val_losses']
     lr_history = results['lr_history']
+    l_p_history = results['l_p_history']
     num_epochs = results['epoch']
     log_file = results['log_file']
 
@@ -111,12 +112,12 @@ def plot_training_performance(results):
     # Add the log file name to the plot
     fig.text(0.01, 0.01, f" {os.path.basename(log_file).strip('_log.txt')}", fontsize=8, color='gray', alpha=0.7)
 
-    if pd.Series(lr_history).nunique() > 1:
+    if pd.Series(l_p_history).nunique() > 1:
         ax2 = ax1.twinx()
-        ax2.plot(range(1, num_epochs + 1), lr_history, label='lr', color='green', linestyle='--')
-        ax2.set_ylabel('Learning Rate', color='green')
+        ax2.plot(np.linspace(1, num_epochs, len(l_p_history)), l_p_history, label='l_p', color='green', linestyle='--')
+        ax2.set_ylabel('l_p', color='green')
         ax2.tick_params(axis='y', labelcolor='green')
-        ax2.set_yscale('log')
+        #ax2.set_yscale('log')
 
 
     # Save the plot to the log file

@@ -22,7 +22,7 @@ def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root) -> t
     # FILTER INPUT FILES --------------------------------------------------------
     # generate lengths of all files by reading metadata or using presaved lengths
     try:
-        presaved_lengths = pd.read_pickle(Path(root, 'data', 'df_files_lengths.pickle'))
+        presaved_lengths = pd.read_pickle(Path(root, 'data', 'df_files_lengths_2.pickle'))
         presaved_lengths = presaved_lengths.set_index('FileName').to_dict()['Length']
         trip_lengths = [presaved_lengths[file.name] for file in files]
     except:
