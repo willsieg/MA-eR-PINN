@@ -1,0 +1,26 @@
+------------------------------------------------------------
+Total Files:	6626
+Filtered Files:	6626
+------------------------------------------------------------
+               FileName  Length  Index
+0       V13_T25.parquet   20843   3868
+1      V13_T352.parquet   18308   3630
+2     V18_T1224.parquet   16645   5939
+3      V101_T37.parquet   16591   4718
+4      V13_T486.parquet   16434   3811
+...                 ...     ...    ...
+6621  V17_T4757.parquet     645   2031
+6622  V14_T1967.parquet     643   5314
+6623    V4_T260.parquet     636   4530
+6624    V4_T244.parquet     628   3798
+6625  V14_T2036.parquet     625   3635
+
+[6626 rows x 3 columns]
+------------------------------------------------------------
+Input Signals:	37
+Target Signals:	1
+Physical Prior Signals:	1
+------------------------------------------------------------
+ --> Warning: Removed the last 5 samples to ensure a balanced batch size
+fitting Scalers: MinMaxScaler, MinMaxScaler, MinMaxScaler
+	50% of the fitting done...

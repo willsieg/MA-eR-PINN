@@ -6,8 +6,8 @@ SEED = 42; torch.manual_seed(SEED)
 
 def print_info(model):
     print(f"{'-'*60}\n", model, f"{'-'*60}\nModel state_dict:")
-    for param_tensor in model.state_dict(): 
-        print(f"{param_tensor}:\t {model.state_dict()[param_tensor].size()}") 
+    #for param_tensor in model.state_dict(): 
+    #    print(f"{param_tensor}:\t {model.state_dict()[param_tensor].size()}") 
     # --> Note torch.Size([4*hidden_size, input_size]) for LSTM weights because of i,o,f,g params concatenated
 
 

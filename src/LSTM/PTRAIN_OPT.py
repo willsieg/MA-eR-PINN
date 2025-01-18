@@ -29,15 +29,15 @@ CONFIG = {
     # SYSTEM: ---------------------------------------------------------------------
     "GPU_SELECT":       0,
     "ROOT":             Path('../..').resolve(),
-    "INPUT_LOCATION":   Path("TripSequences", "trips_processed_pinn_2"), 
+    "INPUT_LOCATION":   Path("TripSequences", "trips_processed_pinn_4"), 
     "OUTPUT_LOCATION":  Path("src", "models", "pth"),
-    "SEED"  :           19,
+    "SEED"  :           18,
     "MIXED_PRECISION":  True,
 
     # DATA PREPROCESSING: ---------------------------------------------------------
     "TRAIN_VAL_TEST":   [0.8, 0.1, 0.1], # [train, val, test splits]
     "MAX_FILES":        None, # None: all files
-    "MIN_SEQ_LENGTH":   1800, # minimum sequence length in s to be included in DataSets
+    "MIN_SEQ_LENGTH":   600, # minimum sequence length in s to be included in DataSets
     "SCALERS":          {'feature_scaler': 'MinMaxScaler()','target_scaler': 'MinMaxScaler()','prior_scaler': 'MinMaxScaler()'},
 
     # FEATURES: -------------------------------------------------------------------
@@ -52,69 +52,72 @@ CONFIG = {
     "PRIORS":           ['emot_soc_pred'],  
 
     # MODEL: -----------------------------------------------------------------------
-    "HIDDEN_SIZE":      12,    # features in the hidden state h
-    "NUM_LAYERS":       3,      # recurrent layers for stacked LSTMs. Default: 1
-    "DROPOUT":          0.35,   # usually: [0.2 - 0.5]
+    "HIDDEN_SIZE":      100,    # features in the hidden state h
+    "NUM_LAYERS":       4,      # recurrent layers for stacked LSTMs. Default: 1
+    "DROPOUT":          0.3,   # usually: [0.2 - 0.5]
     
     # TRAINING & OPTIMIZER: --------------------------------------------------------
-    "NUM_EPOCHS":       10,
-    "BATCH_SIZE":       128,        # [2, 4, 8, 16, 32, 64, 128, 256]
-    "LEARNING_RATE":    1e-3,       # 0.001 lr
-    "WEIGHT_DECAY":     1e-3,       # weight decay coefficient (default: 1e-2)
+    "NUM_EPOCHS":       30,
+    "BATCH_SIZE":       16,         # [2, 4, 8, 16, 32, 64, 128, 256]
+    "LEARNING_RATE":    9e-4,       # 0.001 lr
+    "WEIGHT_DECAY":     1e-5,       # weight decay coefficient (default: 1e-2)
     "MOMENTUM_SGD":     0.1,        # (default: 0.0)
     "OPTIMIZER":        'adamw',    # ('adam', 'sgd', 'adamw')
     "WEIGHT_INIT_TYPE": 'he',  # ('he', 'normal', 'default')
     "CLIP_GRAD":        2.0,        # default: None
     "LRSCHEDULER":      "torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)",  # constant LR for 1.0 as multiplicative factor
                         # torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience = 3, factor = 0.5, min_lr = 1e-7)
-
+    
     # LOSS FUNCTION: ---------------------------------------------------------------
-    "CRITERION":        "nn.SmoothL1Loss()", # ['nn.MSELoss()', 'nn.L1Loss()', 'nn.SmoothL1Loss()', 'nn.HuberLoss()', 'MASE()']
-    "P_LOSS_FACTOR":    0.0, # Physics loss factor
+    "LPSCHEDULER":      "ParameterScheduler(initial_value=0.0, schedule_type='constant', absolute_reduction=-0.0002)",
+    #       'constant': [], 'time_based': ['decay_rate'], 'step_based': ['drop_rate', 'epochs_drop'], 'exponential': ['decay_rate'], 'linear': ['absolute_reduction'], 
+    #       'cosine_annealing': ['total_epochs'], 'cyclic': ['base_lr', 'max_lr', 'step_size']
 }
 
 # +
 # OPTUNA: SEARCH SPACE ---------------------------------------------------
-N_TRIALS = 100
+N_TRIALS = 50
 
 global search_space, search_space_NewData
 search_space = {
     # MODEL: -----------------------------------------------------------------------
-    'HIDDEN_SIZE': ('int', 10, 100, 10),
-    'NUM_LAYERS': ('int', 1, 10, 1),
-    'DROPOUT': ('float', 0.0, 0.6, 0.05),
-    'CLIP_GRAD': ('categorical', (None, 0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0)),
+    'HIDDEN_SIZE': ('int', 60, 200, 20),
+    'NUM_LAYERS': ('int', 2, 6, 1),
+    'DROPOUT': ('float', 0.0, 0.4, 0.05),
+    'CLIP_GRAD': ('categorical', (None, 0.01, 0.1, 1.0, 10, 100)),
     'WEIGHT_INIT_TYPE': ('categorical', ('he', 'normal', 'default')),
 
     # TRAINING & OPTIMIZER: --------------------------------------------------------
-    'OPTIMIZER': ('categorical', ('adam', 'adamw','sgd')),
-    'NUM_EPOCHS': ('int', 5, 20, 1),
-    'LEARNING_RATE': ('categorical', (5e-5, 1e-4, 3e-4, 5e-4, 8e-4, 1e-3, 3e-3, 5e-3, 8e-3, 1e-2, 2e-2, 5e-2)),
-    'WEIGHT_DECAY': ('categorical', (0.0, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2)),
-    'MOMENTUM_SGD': ('float', 0.0, 0.9, 0.1),
+    'OPTIMIZER': ('categorical', ('adam', 'adamw')),
+    #'NUM_EPOCHS': ('int', 5, 10, 1),
+    'LEARNING_RATE': ('categorical', (5e-5, 9e-5, 1e-4, 2e-4, 3e-4, 4e-4, 5e-4, 6e-4, 7e-4, 8e-4, 9e-4, 1e-3, 2e-3, 5e-3, 8e-3)),
+    'WEIGHT_DECAY': ('categorical', (0.0, 1e-6, 1e-5, 1e-4, 1e-3)),
+    #'MOMENTUM_SGD': ('float', 0.0, 0.9, 0.1),
 
     #'P_LOSS_FACTOR': ('float', 0.05, 1.0, 0.05)
 }
 
 search_space_NewData = {
-    # DATA PREPROCESSING: ---------------------------------------------------------
-    "MIN_SEQ_LENGTH": ('int', 300, 3600, 300),
     'BATCH_SIZE': ('categorical', (4, 8, 16, 32, 64, 128)),
 }
 
-
 # +
-# LOSS FUNCTION MODULES ----------------------------------------------------------------   
-
-def loss_fn_PINN_3(output, target, prior):
-    l_p = P_LOSS_FACTOR
-    y_pred = output; y_true = target; y_phys = prior
-    total_loss = F.mse_loss(y_true, (l_p * y_phys + (1 - l_p) * y_pred), reduction='mean')
-    return total_loss
-
+# LOSS FUNCTION MODULES ----------------------------------------------------------------  
 global LOSS_FN
-LOSS_FN = loss_fn_PINN_3
+from torch import nn
 
+class CustomLoss(nn.Module):
+    def __init__(self):
+        super(CustomLoss, self).__init__()
+        self.mse_loss = nn.MSELoss()
+        
+    def forward(self, y_pred, y_true, y_phys, l_p):
+        mse_loss_value = self.mse_loss(y_pred, y_true)                      # loss w.r.t. data
+        phys_loss_value = self.mse_loss(y_pred, y_phys)                     # loss w.r.t. physical model
+        total_loss = (1 - l_p) * mse_loss_value + l_p * phys_loss_value     # total loss, weighted by l_p-factor
+        return total_loss
+
+LOSS_FN = CustomLoss()
 # -
 
 # ___
@@ -134,6 +137,7 @@ from src.utils.data_utils import *
 from src.utils.preprocess_utils import *
 from src.utils.eval_utils import *
 from src.utils.Trainers import *
+from src.utils.scheduler_utils import *
 from src.models.lstm_models import *
 
 # SETUP ENVIRONMENT ---------------------------------------------------------------------
@@ -228,17 +232,10 @@ if IS_NOTEBOOK and False:
 class LSTM1_packed_old_version(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, dropout, device=DEVICE):
         super(LSTM1_packed_old_version, self).__init__()
-
-        self.input_size = input_size    # input size
-        self.hidden_size = hidden_size  # hidden state
-        self.num_layers = num_layers    # number of layers
-        self.dropout = dropout
-
         # LSTM CELL --------------------------------
-        self.lstm = nn.LSTM(self.input_size,self.hidden_size,self.num_layers,batch_first=True,dropout=self.dropout,device=device)
-
+        self.lstm = nn.LSTM(input_size,hidden_size,num_layers,batch_first=True,dropout=dropout,device=device)
         # LAYERS -----------------------------------
-        self.dropout_layer = nn.Dropout(self.dropout)
+        self.dropout_layer = nn.Dropout(dropout)
         self.fc1 = nn.Linear(hidden_size, hidden_size // 2)
         self.bn1 = nn.BatchNorm1d(hidden_size // 2)
         self.fc2 = nn.Linear(hidden_size // 2, 1)
@@ -255,14 +252,60 @@ class LSTM1_packed_old_version(nn.Module):
         out = self.fc2(out)  # fully connected layer 2
         return out
 
-    # Define the weight initialization function for LSTM
+    # Define the weight initialization function for LSTM and other layers
     def initialize_weights_lstm(self, init_type):
         for name, param in self.named_parameters():
             if 'weight_ih' in name or 'weight_hh' in name:
-                if init_type == 'he': nn.init.kaiming_uniform_(param.data, nonlinearity='relu')     # HE INIT
-                elif init_type == 'normal': nn.init.normal_(param.data, mean=0.0, std=0.02)         # NORMAL INIT
-                elif init_type == 'default': continue                                               # TORCH DEFAULT INIT
-            elif 'bias' in name and init_type != 'default': nn.init.constant_(param.data, 0)
+                if init_type == 'he': nn.init.kaiming_uniform_(param.data, nonlinearity='relu')  # HE INIT
+                elif init_type == 'normal': nn.init.normal_(param.data, mean=0.0, std=0.02)  # NORMAL INIT
+                elif init_type == 'default': continue  # TORCH DEFAULT INIT
+            elif 'weight' in name:
+                if param.dim() >= 2:  # Ensure the tensor has at least 2 dimensions
+                    if init_type == 'he': nn.init.kaiming_uniform_(param.data, nonlinearity='relu')  # HE INIT for FC layers
+                    elif init_type == 'normal': nn.init.normal_(param.data, mean=0.0, std=0.02)  # NORMAL INIT for FC layers
+                    elif init_type == 'default': continue  # TORCH DEFAULT INIT
+            elif 'bias' in name and init_type != 'default': nn.init.constant_(param.data, 0)  # Initialize biases to 0
+
+class DeepLSTM_v2(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, dropout, device=DEVICE):
+        super(DeepLSTM_v2, self).__init__()
+
+        self.lstm = nn.LSTM(input_size,hidden_size,num_layers,batch_first=True,dropout=0,device=device) # LSTM Dropout = 0 !
+        self.dropout_layer = nn.Dropout(dropout)
+        self.fc1 = nn.Linear(hidden_size, hidden_size // 2)
+        self.bn1 = nn.BatchNorm1d(hidden_size // 2)
+        self.fc2 = nn.Linear(hidden_size // 2, hidden_size // 4)
+        self.bn2 = nn.BatchNorm1d(hidden_size // 4)
+        self.fc3 = nn.Linear(hidden_size // 4, 1)
+        self.relu = nn.ReLU()
+
+    def forward(self, packed_input, batch_size=None):
+        packed_out, _ = self.lstm(packed_input)
+        out, _ = pad_packed_sequence(packed_out, batch_first=True)
+        out = self.relu(out)
+        out = self.dropout_layer(out)
+        out = self.fc1(out)
+        out = self.bn1(out.transpose(1, 2)).transpose(1, 2)
+        out = self.relu(out)
+        out = self.fc2(out)
+        out = self.bn2(out.transpose(1, 2)).transpose(1, 2)
+        out = self.relu(out)
+        out = self.fc3(out)
+        return out
+
+    # Define the weight initialization function for LSTM and other layers
+    def initialize_weights_lstm(self, init_type):
+        for name, param in self.named_parameters():
+            if 'weight_ih' in name or 'weight_hh' in name:
+                if init_type == 'he': nn.init.kaiming_uniform_(param.data, nonlinearity='relu')  # HE INIT
+                elif init_type == 'normal': nn.init.normal_(param.data, mean=0.0, std=0.02)  # NORMAL INIT
+                elif init_type == 'default': continue  # TORCH DEFAULT INIT
+            elif 'weight' in name:
+                if param.dim() >= 2:  # Ensure the tensor has at least 2 dimensions
+                    if init_type == 'he': nn.init.kaiming_uniform_(param.data, nonlinearity='relu')  # HE INIT for FC layers
+                    elif init_type == 'normal': nn.init.normal_(param.data, mean=0.0, std=0.02)  # NORMAL INIT for FC layers
+                    elif init_type == 'default': continue  # TORCH DEFAULT INIT
+            elif 'bias' in name and init_type != 'default': nn.init.constant_(param.data, 0)  # Initialize biases to 0
 
 
 # -
@@ -270,8 +313,9 @@ class LSTM1_packed_old_version(nn.Module):
 # ___
 # OPTUNA: Hyperparameter Optimization
 
+# +
 # OPTUNA: OBJECTIVE ---------------------------------------------------
-def objective(trial, LOSS_FN):
+def objective(trial):
 
     # OPTUNA: CREATE TRIAL OBJECTS ---------------------------------------------------
     optuna_params = {}
@@ -287,9 +331,9 @@ def objective(trial, LOSS_FN):
 
     # TRAINING_CODE: -----------------------------------------------------------------
     # INSTANTIATE MODEL AND APPLY WEIGHT INITIALIZATION --------------------
-    model = LSTM1_packed_old_version(len(INPUT_COLUMNS), HIDDEN_SIZE, NUM_LAYERS, DROPOUT).to(DEVICE)
+    model = DeepLSTM_v2(len(INPUT_COLUMNS), HIDDEN_SIZE, NUM_LAYERS, DROPOUT).to(DEVICE)
     model.initialize_weights_lstm(WEIGHT_INIT_TYPE)
-    #print_info(model)
+    print_info(model)
     
     # SET OPTIMIIZER, SCHEDULER AND LOSS MODULES ---------------------------
     if OPTIMIZER=='adam': optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
@@ -297,13 +341,14 @@ def objective(trial, LOSS_FN):
     elif OPTIMIZER=='sgd': optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM_SGD, weight_decay=WEIGHT_DECAY)
 
     def lr_lambda(epoch): return 1.0
-    scheduler = eval(LRSCHEDULER); criterion = eval(CRITERION)
+    lr_scheduler = eval(LRSCHEDULER); l_p_scheduler = eval(LPSCHEDULER)
 
     # TRAIN -----------------------------------------------------------------
     TRAINER = PTrainer_PINN(
         model = model, 
         optimizer = optimizer, 
-        scheduler = scheduler,
+        lr_scheduler = lr_scheduler,
+        l_p_scheduler = l_p_scheduler,
         loss_fn = LOSS_FN, 
         train_loader = train_loader, 
         val_loader = val_loader, 
@@ -313,8 +358,9 @@ def objective(trial, LOSS_FN):
         is_notebook = IS_NOTEBOOK, 
         use_mixed_precision = MIXED_PRECISION, 
         clip_value = CLIP_GRAD, 
-        log_file = Path(LOG_FILE_NAME).with_name(f"{TS}_Trial{trial.number}.txt"))
-
+        log_file = Path(LOG_FILE_NAME).with_name(f"{TS}_Trial{trial.number}.txt"),
+        config = CONFIG)
+        
     RESULTS = TRAINER.train_model()
 
     # PLOT RESULTS AND SAVE OPERATIONS ----------------------------------------------
@@ -335,22 +381,35 @@ def objective(trial, LOSS_FN):
     all_y_true, all_y_pred, all_y_phys = np.concatenate(scaled_targets), np.concatenate(scaled_outputs), np.concatenate(scaled_priors)
     # calculate evaluation metrics
     print(f"Test Loss:\t\t{test_loss:.6f}")
-    metrics = calculate_metrics(all_y_true, all_y_pred) # [rmse, mae, std_dev, mape, r2, max_error]
+    metrics = calculate_metrics(all_y_true, all_y_pred); # [rmse, mae, std_dev, mape, r2, max_error]
+    mean_metrics = calculate_metrics_per_sequence(scaled_targets, scaled_outputs);
 
     rmse = metrics["rmse"]; trial.set_user_attr("rmse", rmse)
-    mae = metrics["mae"]; trial.set_user_attr("mae", metrics["mae"])
-    std = metrics["std_dev"]; trial.set_user_attr("std_dev", metrics["std_dev"])
-    mape = metrics["mape"]; trial.set_user_attr("mape", metrics["mape"])
+    mae = metrics["mae"]; trial.set_user_attr("mae", mae)
+    std = metrics["std_dev"]; trial.set_user_attr("std_dev", std)
+    mape = metrics["mape"]; trial.set_user_attr("mape", mape)
 
-    return rmse
+    rmse_mean = mean_metrics["rmse"]; trial.set_user_attr("rmse_mean", rmse_mean)
+    mae_mean = mean_metrics["mae"]; trial.set_user_attr("mae_mean", mae_mean)
+    std_mean = mean_metrics["std_dev"]; trial.set_user_attr("std_dev_mean", std_mean)
+    mape_mean = mean_metrics["mape"]; trial.set_user_attr("mape_mean", mape_mean)
 
+    return mae
+
+# Define the callback function
+def print_completed_trials_sorted(study, trial):
+    print("Trial {} completed.".format(trial.number))
+    print("All completed trials (sorted by value):")
+    completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+    completed_trials_sorted = sorted(completed_trials, key=lambda t: t.value)
+    for t in completed_trials_sorted: print("  Trial {}: Value: {}, Params: {}".format(t.number, t.value, t.params))
+
+
+# -
 
 # OPTUNA: STUDY -------------------------------------------------------------------
-study = optuna.create_study(direction='minimize', sampler = optuna.samplers.RandomSampler())    # TPESampler, RandomSampler, GridSampler, CmaEsSampler, NSGAIISampler
-study.optimize(lambda trial: objective(trial, LOSS_FN), n_trials=N_TRIALS)
-
-for trial in study.trials:
-    print(f"Trial {trial.number}: Value: {trial.value}, RMSE: {trial.user_attrs['rmse']}, MAE: {trial.user_attrs['mae']}, STD_dev: {trial.user_attrs['std_dev']}, MAPE: {trial.user_attrs['mape']}")
+study = optuna.create_study(direction='minimize', sampler = optuna.samplers.TPESampler())    # TPESampler, RandomSampler, GridSampler, CmaEsSampler, NSGAIISampler
+study.optimize(objective, n_trials=N_TRIALS, callbacks=[print_completed_trials_sorted])
 
 # ___
 # SAVE CHECKPOINT
@@ -361,5 +420,6 @@ best_trial_dict = {'params': best_trial.params, 'value': best_trial.value}
 with open(Path(LOG_FILE_NAME).with_name(f"{TS}_BEST_IS_{best_trial.number}.txt"), 'w') as f: json.dump(best_trial_dict, f, indent=4)
 print("Best Trial: ", best_trial.number); print("Best hyperparameters: ", study.best_params)
 trials_df = study.trials_dataframe()
+sorted_df = trials_df.sort_values(by=trials_df.columns[1], ascending=True)
 print(tabulate(trials_df, headers='keys', tablefmt='psql'))
-trials_df.to_csv(Path(LOG_FILE_NAME).with_name(f"trials_overview.csv"), index=False)
+sorted_df.to_csv(Path(LOG_FILE_NAME).with_name(f"trials_overview.csv"), index=False)
