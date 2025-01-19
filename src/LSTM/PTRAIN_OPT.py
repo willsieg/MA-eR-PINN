@@ -31,11 +31,11 @@ CONFIG = {
     "ROOT":             Path('../..').resolve(),
     "INPUT_LOCATION":   Path("TripSequences", "trips_processed_pinn_4"), 
     "OUTPUT_LOCATION":  Path("src", "models", "pth"),
-    "SEED"  :           18,
-    "MIXED_PRECISION":  True,
+    "SEED"  :           17,
+    "MIXED_PRECISION":  False,
 
     # DATA PREPROCESSING: ---------------------------------------------------------
-    "TRAIN_VAL_TEST":   [0.8, 0.1, 0.1], # [train, val, test splits]
+    "TRAIN_VAL_TEST":   [0.7, 0.15, 0.15], # [train, val, test splits]
     "MAX_FILES":        None, # None: all files
     "MIN_SEQ_LENGTH":   600, # minimum sequence length in s to be included in DataSets
     "SCALERS":          {'feature_scaler': 'MinMaxScaler()','target_scaler': 'MinMaxScaler()','prior_scaler': 'MinMaxScaler()'},
@@ -52,19 +52,19 @@ CONFIG = {
     "PRIORS":           ['emot_soc_pred'],  
 
     # MODEL: -----------------------------------------------------------------------
-    "HIDDEN_SIZE":      100,    # features in the hidden state h
-    "NUM_LAYERS":       4,      # recurrent layers for stacked LSTMs. Default: 1
-    "DROPOUT":          0.3,   # usually: [0.2 - 0.5]
+    "HIDDEN_SIZE":      60,    # features in the hidden state h
+    "NUM_LAYERS":       3,      # recurrent layers for stacked LSTMs. Default: 1
+    "DROPOUT":          0.05,   # usually: [0.2 - 0.5]
     
     # TRAINING & OPTIMIZER: --------------------------------------------------------
-    "NUM_EPOCHS":       30,
-    "BATCH_SIZE":       16,         # [2, 4, 8, 16, 32, 64, 128, 256]
-    "LEARNING_RATE":    9e-4,       # 0.001 lr
-    "WEIGHT_DECAY":     1e-5,       # weight decay coefficient (default: 1e-2)
+    "NUM_EPOCHS":       30,         # Max 
+    "BATCH_SIZE":       64,         # [2, 4, 8, 16, 32, 64, 128, 256]
+    "LEARNING_RATE":    0.0004,       # 0.001 lr
+    "WEIGHT_DECAY":     0.0,       # weight decay coefficient (default: 1e-2)
     "MOMENTUM_SGD":     0.1,        # (default: 0.0)
-    "OPTIMIZER":        'adamw',    # ('adam', 'sgd', 'adamw')
+    "OPTIMIZER":        'adam',    # ('adam', 'sgd', 'adamw')
     "WEIGHT_INIT_TYPE": 'he',  # ('he', 'normal', 'default')
-    "CLIP_GRAD":        2.0,        # default: None
+    "CLIP_GRAD":        10.0,        # default: None
     "LRSCHEDULER":      "torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)",  # constant LR for 1.0 as multiplicative factor
                         # torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience = 3, factor = 0.5, min_lr = 1e-7)
     
@@ -81,20 +81,17 @@ N_TRIALS = 50
 global search_space, search_space_NewData
 search_space = {
     # MODEL: -----------------------------------------------------------------------
-    'HIDDEN_SIZE': ('int', 60, 200, 20),
-    'NUM_LAYERS': ('int', 2, 6, 1),
-    'DROPOUT': ('float', 0.0, 0.4, 0.05),
-    'CLIP_GRAD': ('categorical', (None, 0.01, 0.1, 1.0, 10, 100)),
-    'WEIGHT_INIT_TYPE': ('categorical', ('he', 'normal', 'default')),
+    'HIDDEN_SIZE': ('int', 20, 200, 20),
+    'NUM_LAYERS': ('int', 3, 6, 1),
+    'DROPOUT': ('float', 0.0, 0.3, 0.01),
+    'CLIP_GRAD': ('categorical', (0.1, 1.0, 10, 100, 1000, None)),
+    #'WEIGHT_INIT_TYPE': ('categorical', ('he', 'normal', 'default')),
 
     # TRAINING & OPTIMIZER: --------------------------------------------------------
-    'OPTIMIZER': ('categorical', ('adam', 'adamw')),
+    #'OPTIMIZER': ('categorical', ('adam', 'adamw')),
     #'NUM_EPOCHS': ('int', 5, 10, 1),
-    'LEARNING_RATE': ('categorical', (5e-5, 9e-5, 1e-4, 2e-4, 3e-4, 4e-4, 5e-4, 6e-4, 7e-4, 8e-4, 9e-4, 1e-3, 2e-3, 5e-3, 8e-3)),
-    'WEIGHT_DECAY': ('categorical', (0.0, 1e-6, 1e-5, 1e-4, 1e-3)),
-    #'MOMENTUM_SGD': ('float', 0.0, 0.9, 0.1),
-
-    #'P_LOSS_FACTOR': ('float', 0.05, 1.0, 0.05)
+    'LEARNING_RATE': ('categorical', (9e-5, 1e-4, 2e-4, 3e-4, 4e-4, 5e-4, 6e-4, 7e-4, 8e-4, 9e-4, 1e-3, 2e-3)),
+    'WEIGHT_DECAY': ('categorical', (0.0, 1e-7, 1e-6, 1e-5, 1e-4)),
 }
 
 search_space_NewData = {

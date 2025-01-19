@@ -1,5 +1,7 @@
 import os, time, math, torch, random
+import pandas as pd
 import torch.nn as nn
+import numpy as np
 from torch.utils.data import DataLoader
 #from torchrl.trainers import Trainer as TorchRLTrainer
 from tqdm.notebook import tqdm as tqdm_nb
@@ -13,6 +15,35 @@ SEED = 42; random.seed(SEED); torch.manual_seed(SEED)
 
 
 #############################################################################################################
+class EarlyStopping:
+    def __init__(self, patience=7, verbose=False, delta=0):
+
+        self.patience = patience
+        self.verbose = verbose
+        self.delta = delta
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.val_loss_min = np.Inf
+
+    def __call__(self, val_loss):
+        score = -val_loss
+        if self.best_score is None:
+            self.best_score = score
+            self.val_loss_min = val_loss
+        elif score < self.best_score + self.delta:
+            self.counter += 1
+            if self.verbose: print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+            if self.counter >= self.patience: self.early_stop = True
+        else:
+            self.best_score = score
+            self.val_loss_min = val_loss
+            self.counter = 0
+            #self.patience -= 1  # Reduce patience
+            if self.verbose: print(f'Validation loss improved. Reducing patience to {self.patience}')
+
+
+#############################################################################################################
 #############################################################################################################
 # -----------------------------------------------------------------------------------------------------------
 class PTrainer_PINN():
@@ -21,7 +52,7 @@ class PTrainer_PINN():
                  train_loader: DataLoader, num_epochs: int, device: torch.device, 
                  is_notebook: bool = False, val_loader: DataLoader = None, test_loader: DataLoader = None, 
                  lr_scheduler: torch.optim.lr_scheduler._LRScheduler = None, l_p_scheduler = None,
-                 state: dict = None, use_mixed_precision: bool = False, clip_value = None, log_file = "latest_run.txt"):
+                 state: dict = None, use_mixed_precision: bool = False, clip_value = None, log_file = "latest_run.txt", config = None):
 
         self.model = model
         self.optimizer = optimizer
@@ -40,6 +71,10 @@ class PTrainer_PINN():
         if self.use_mixed_precision: self.scaler = GradScaler('cuda')  # Initialize GradScaler
         self.clip_value = clip_value
         self.log_file = log_file if log_file is not None else None
+        self.config = config
+
+        # Early Stopping:
+        self.early_stopping = EarlyStopping(patience=10, verbose=True)
 
         # Redirect print statements to a log file
         if self.log_file: self.log = open(self.log_file, "w")
@@ -208,7 +243,7 @@ class PTrainer_PINN():
 
                         self.scaler.scale(loss).backward()  # Scale the loss and perform backward pass
                         if self.clip_value is not None:
-                            nn.utils.clip_grad_value_(self.model.parameters(), clip_value=self.clip_value)  # optional: Gradient Value Clipping
+                            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip_value)  # optional: Gradient Value Clipping
                         self.scaler.step(self.optimizer)  # Update model parameters
                         self.scaler.update()  # Update the scale for next iteration
 
@@ -228,7 +263,7 @@ class PTrainer_PINN():
                         loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
                         loss.backward()
                         if self.clip_value is not None:
-                            nn.utils.clip_grad_value_(self.model.parameters(), clip_value=self.clip_value)  # optional: Gradient Value Clipping
+                            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip_value)  # optional: Gradient Value Clipping
                         self.optimizer.step()
 
                     # -------------------------------------------------------------
@@ -278,9 +313,22 @@ class PTrainer_PINN():
                 else:
                     print_row(self.training_table)
 
+            self.early_stopping(val_loss)
+            if self.early_stopping.early_stop:
+                print(f"Early stopping.\n{'-'*60}\n")
+                break
+
         elapsed_time = round(time.perf_counter() - start_time)
         self.print_and_log(f"{'-'*60}\nTraining Completed.\tExecution Time: {time.strftime('%H:%M:%S', time.gmtime(elapsed_time))}\n{'-'*60}\n")
+
+        if self.config is not None:
+                config_df = pd.DataFrame(list(self.config.items()), columns=['Parameter', 'Value'])
+                config_df['Value'] = config_df['Value'].apply(lambda x: str(x).replace(',', ',\n') if len(str(x)) > 120 else str(x))
+                self.only_log(f"CONFIG Dictionary:\n{'-'*129}\n", tabulate(config_df, headers='keys', colalign=("left", "left"), \
+                    maxcolwidths=[30, 120]), f"\n{'-'*129}\n")
         if self.log_file: self.log.close()
+
+
         return {
             # model and optimizer states
             "model_state_dict": self.model.state_dict(),
