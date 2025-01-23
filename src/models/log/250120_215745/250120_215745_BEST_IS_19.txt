@@ -1,0 +1,11 @@
+{
+    "params": {
+        "HIDDEN_SIZE": 200,
+        "NUM_LAYERS": 4,
+        "DROPOUT": 0.02,
+        "CLIP_GRAD": 1.0,
+        "LEARNING_RATE": 0.00030000000000000003,
+        "WEIGHT_DECAY": 1e-06
+    },
+    "value": 1.5127174854278564
+}

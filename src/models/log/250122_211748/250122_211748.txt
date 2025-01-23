@@ -1,0 +1,56 @@
+------------------------------------------------------------
+Total Files:	6626
+Filtered Files:	6626
+------------------------------------------------------------
+               FileName  Length  Index
+0       V13_T25.parquet   20843   3868
+1      V13_T352.parquet   18308   3630
+2     V18_T1224.parquet   16645   5939
+3      V101_T37.parquet   16591   4718
+4      V13_T486.parquet   16434   3811
+...                 ...     ...    ...
+6621  V17_T4757.parquet     645   2031
+6622  V14_T1967.parquet     643   5314
+6623    V4_T260.parquet     636   4530
+6624    V4_T244.parquet     628   3798
+6625  V14_T2036.parquet     625   3635
+
+[6626 rows x 3 columns]
+------------------------------------------------------------
+Input Signals:	37
+Target Signals:	1
+Physical Prior Signals:	1
+------------------------------------------------------------
+ --> Warning: Removed the last 31 samples to ensure a balanced batch size
+fitting Scalers: MinMaxScaler, MinMaxScaler, MinMaxScaler
+	50% of the fitting done...
+Done. Create DataSets and DataLoaders...
+	Number of batches created: 72
+	Number of batches created: 16
+	Number of batches created: 16
+------------------------------------------------------------
+Train size:  22035350		(Files: 4608)
+Val. size:   4779129		(Files: 994)
+Test size:   4635097		(Files: 993) 
+ ------------------------------------------------------------
+	Removed 31 file from the dataset
+------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/sieglew/MA-eR-PINN/src/LSTM/PTRAIN_OPT.py", line 490, in <module>
+    study.optimize(objective, n_trials=N_TRIALS, callbacks=[print_completed_trials_sorted])
+  File "/home/sieglew/.conda/envs/sieglew/lib/python3.11/site-packages/optuna/study/study.py", line 475, in optimize
+    _optimize(
+  File "/home/sieglew/.conda/envs/sieglew/lib/python3.11/site-packages/optuna/study/_optimize.py", line 63, in _optimize
+    _optimize_sequential(
+  File "/home/sieglew/.conda/envs/sieglew/lib/python3.11/site-packages/optuna/study/_optimize.py", line 160, in _optimize_sequential
+    frozen_trial = _run_trial(study, func, catch)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sieglew/.conda/envs/sieglew/lib/python3.11/site-packages/optuna/study/_optimize.py", line 248, in _run_trial
+    raise func_err
+  File "/home/sieglew/.conda/envs/sieglew/lib/python3.11/site-packages/optuna/study/_optimize.py", line 197, in _run_trial
+    value_or_values = func(trial)
+                      ^^^^^^^^^^^
+  File "/home/sieglew/MA-eR-PINN/src/LSTM/PTRAIN_OPT.py", line 400, in objective
+    for param, (suggest_type, *args) in search_space.items():
+                                        ^^^^^^^^^^^^
+NameError: name 'search_space' is not defined. Did you mean: 'search_space_1'?

@@ -74,7 +74,7 @@ class PTrainer_PINN():
         self.config = config
 
         # Early Stopping:
-        self.early_stopping = EarlyStopping(patience=10, verbose=True)
+        self.early_stopping = EarlyStopping(patience=8, verbose=True)
 
         # Redirect print statements to a log file
         if self.log_file: self.log = open(self.log_file, "w")

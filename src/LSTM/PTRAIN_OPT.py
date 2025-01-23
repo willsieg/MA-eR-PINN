@@ -23,6 +23,7 @@ PTRAIN - Standard Pipeline Framework for Training the PINN
 + OPTUNA - Hyperparameter Optimization using Optuna
 ------------------------------------------------------------------''';
 
+# +
 # MA-eR-PINN: CONFIGURATION FILE -------------------------------------------------
 from pathlib import Path
 CONFIG = {
@@ -31,8 +32,8 @@ CONFIG = {
     "ROOT":             Path('../..').resolve(),
     "INPUT_LOCATION":   Path("TripSequences", "trips_processed_pinn_4"), 
     "OUTPUT_LOCATION":  Path("src", "models", "pth"),
-    "SEED"  :           17,
-    "MIXED_PRECISION":  False,
+    "SEED"  :           15,
+    "MIXED_PRECISION":  True,
 
     # DATA PREPROCESSING: ---------------------------------------------------------
     "TRAIN_VAL_TEST":   [0.7, 0.15, 0.15], # [train, val, test splits]
@@ -52,50 +53,84 @@ CONFIG = {
     "PRIORS":           ['emot_soc_pred'],  
 
     # MODEL: -----------------------------------------------------------------------
-    "HIDDEN_SIZE":      60,    # features in the hidden state h
-    "NUM_LAYERS":       3,      # recurrent layers for stacked LSTMs. Default: 1
-    "DROPOUT":          0.05,   # usually: [0.2 - 0.5]
+    "HIDDEN_SIZE":      200,    # features in the hidden state h
+    "NUM_LAYERS":       4,      # recurrent layers for stacked LSTMs. Default: 1
+    "DROPOUT":          0.015,  # usually: [0.2 - 0.5]
     
     # TRAINING & OPTIMIZER: --------------------------------------------------------
-    "NUM_EPOCHS":       30,         # Max 
+    "NUM_EPOCHS":       20,         # max epochs
     "BATCH_SIZE":       64,         # [2, 4, 8, 16, 32, 64, 128, 256]
-    "LEARNING_RATE":    0.0004,       # 0.001 lr
-    "WEIGHT_DECAY":     0.0,       # weight decay coefficient (default: 1e-2)
-    "MOMENTUM_SGD":     0.1,        # (default: 0.0)
-    "OPTIMIZER":        'adam',    # ('adam', 'sgd', 'adamw')
-    "WEIGHT_INIT_TYPE": 'he',  # ('he', 'normal', 'default')
-    "CLIP_GRAD":        10.0,        # default: None
+    "LEARNING_RATE":    0.0003,     # 0.001 lr
+    "OPTIMIZER":        'adam',     # ('adam', 'sgd', 'adamw')
+    "WEIGHT_DECAY":     1e-7,       # weight decay coefficient (default: 1e-2)
+    "WEIGHT_INIT_TYPE": 'he',       # ('he', 'normal', 'default')
+    "CLIP_GRAD":        None,       # default: None
     "LRSCHEDULER":      "torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)",  # constant LR for 1.0 as multiplicative factor
-                        # torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience = 3, factor = 0.5, min_lr = 1e-7)
-    
+
     # LOSS FUNCTION: ---------------------------------------------------------------
     "LPSCHEDULER":      "ParameterScheduler(initial_value=0.0, schedule_type='constant', absolute_reduction=-0.0002)",
     #       'constant': [], 'time_based': ['decay_rate'], 'step_based': ['drop_rate', 'epochs_drop'], 'exponential': ['decay_rate'], 'linear': ['absolute_reduction'], 
     #       'cosine_annealing': ['total_epochs'], 'cyclic': ['base_lr', 'max_lr', 'step_size']
+
 }
 
 # +
 # OPTUNA: SEARCH SPACE ---------------------------------------------------
-N_TRIALS = 50
+N_TRIALS = 20
 
-global search_space, search_space_NewData
-search_space = {
+global search_space_1, search_space
+search_space_1 = {
     # MODEL: -----------------------------------------------------------------------
-    'HIDDEN_SIZE': ('int', 20, 200, 20),
-    'NUM_LAYERS': ('int', 3, 6, 1),
-    'DROPOUT': ('float', 0.0, 0.3, 0.01),
-    'CLIP_GRAD': ('categorical', (0.1, 1.0, 10, 100, 1000, None)),
-    #'WEIGHT_INIT_TYPE': ('categorical', ('he', 'normal', 'default')),
+    'HIDDEN_SIZE': ('int', 80, 200, 20),
+    'NUM_LAYERS': ('int', 2, 6, 1),
+    'DROPOUT': ('float', 0.0, 0.4, 0.05),
+    'CLIP_GRAD': ('categorical', (None, 0.1, 1.0, 10, 100)),
+    'WEIGHT_INIT_TYPE': ('categorical', ('he', 'normal', 'default')),
 
     # TRAINING & OPTIMIZER: --------------------------------------------------------
-    #'OPTIMIZER': ('categorical', ('adam', 'adamw')),
+    'OPTIMIZER': ('categorical', ('adam', 'adamw')),
     #'NUM_EPOCHS': ('int', 5, 10, 1),
-    'LEARNING_RATE': ('categorical', (9e-5, 1e-4, 2e-4, 3e-4, 4e-4, 5e-4, 6e-4, 7e-4, 8e-4, 9e-4, 1e-3, 2e-3)),
-    'WEIGHT_DECAY': ('categorical', (0.0, 1e-7, 1e-6, 1e-5, 1e-4)),
+    'LEARNING_RATE': ('categorical', (9e-5, 1e-4, 2e-4, 3e-4, 4e-4, 5e-4, 6e-4, 7e-4, 8e-4, 9e-4, 1e-3, 2e-3, 5e-3, 8e-3, 1e-2)),
+    'WEIGHT_DECAY': ('categorical', (0.0, 1e-5, 1e-4, 1e-3, 1e-2)),
+    #'MOMENTUM_SGD': ('float', 0.0, 0.9, 0.1),
+
+    #'P_LOSS_FACTOR': ('float', 0.05, 1.0, 0.05)
 }
 
-search_space_NewData = {
-    'BATCH_SIZE': ('categorical', (4, 8, 16, 32, 64, 128)),
+# l_p_scheduler
+search_space = {
+    'LPSCHEDULER': ('categorical',( 
+    # 'constant': []
+    "ParameterScheduler(initial_value=0.0, schedule_type='constant')",  # base
+    "ParameterScheduler(initial_value=1.0, schedule_type='constant')",
+    "ParameterScheduler(initial_value=0.5, schedule_type='constant')",
+
+    # 'linear': ['absolute_reduction']
+    "ParameterScheduler(initial_value=0.0, schedule_type='linear', absolute_reduction=-0.0007)",
+    "ParameterScheduler(initial_value=1.0, schedule_type='linear', absolute_reduction=0.0007)"
+    "ParameterScheduler(initial_value=1.0, schedule_type='linear', absolute_reduction=0.00035)"
+
+    # 'time_based': ['decay_rate']
+    "ParameterScheduler(initial_value=1.0, schedule_type='time_based', decay_rate=0.01)",
+    "ParameterScheduler(initial_value=1.0, schedule_type='time_based', decay_rate=0.1)",
+
+    # 'exponential': ['decay_rate']
+    "ParameterScheduler(initial_value=1.0, schedule_type='exponential', decay_rate=0.999)",
+    "ParameterScheduler(initial_value=1.0, schedule_type='exponential', decay_rate=0.998)",
+
+    # 'step_based': ['drop_rate', 'epochs_drop']
+    "ParameterScheduler(initial_value=1.0, schedule_type='step_based', drop_rate=0.5, epochs_drop=144)",
+    "ParameterScheduler(initial_value=1.0, schedule_type='step_based', drop_rate=0.9, epochs_drop=144)",
+ 
+    # 'cosine_annealing': ['total_epochs']
+    "ParameterScheduler(initial_value=0.0, schedule_type='cosine_annealing', total_epochs=1440)",
+    "ParameterScheduler(initial_value=0.0, schedule_type='cosine_annealing', total_epochs=720)",
+    "ParameterScheduler(initial_value=0.0, schedule_type='cosine_annealing', total_epochs=360)",
+
+    # cyclic': ['base_lr', 'max_lr', 'step_size']
+    "ParameterScheduler(initial_value=0.0, schedule_type='cyclic', base_lr=0.1, max_lr=1, step_size=144)",
+ )),
+
 }
 
 # +
@@ -230,7 +265,7 @@ class LSTM1_packed_old_version(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, dropout, device=DEVICE):
         super(LSTM1_packed_old_version, self).__init__()
         # LSTM CELL --------------------------------
-        self.lstm = nn.LSTM(input_size,hidden_size,num_layers,batch_first=True,dropout=dropout,device=device)
+        self.lstm = nn.LSTM(input_size,hidden_size,num_layers,batch_first=True,dropout=0,device=device)
         # LAYERS -----------------------------------
         self.dropout_layer = nn.Dropout(dropout)
         self.fc1 = nn.Linear(hidden_size, hidden_size // 2)
@@ -288,6 +323,52 @@ class DeepLSTM_v2(nn.Module):
         out = self.bn2(out.transpose(1, 2)).transpose(1, 2)
         out = self.relu(out)
         out = self.fc3(out)
+        return out
+
+    # Define the weight initialization function for LSTM and other layers
+    def initialize_weights_lstm(self, init_type):
+        for name, param in self.named_parameters():
+            if 'weight_ih' in name or 'weight_hh' in name:
+                if init_type == 'he': nn.init.kaiming_uniform_(param.data, nonlinearity='relu')  # HE INIT
+                elif init_type == 'normal': nn.init.normal_(param.data, mean=0.0, std=0.02)  # NORMAL INIT
+                elif init_type == 'default': continue  # TORCH DEFAULT INIT
+            elif 'weight' in name:
+                if param.dim() >= 2:  # Ensure the tensor has at least 2 dimensions
+                    if init_type == 'he': nn.init.kaiming_uniform_(param.data, nonlinearity='relu')  # HE INIT for FC layers
+                    elif init_type == 'normal': nn.init.normal_(param.data, mean=0.0, std=0.02)  # NORMAL INIT for FC layers
+                    elif init_type == 'default': continue  # TORCH DEFAULT INIT
+            elif 'bias' in name and init_type != 'default': nn.init.constant_(param.data, 0)  # Initialize biases to 0
+
+class DeepLSTM_v3(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, dropout, device='cpu'):
+        super(DeepLSTM_v3, self).__init__()
+
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout, device=device)  # LSTM Dropout = 0 !
+        self.dropout_layer = nn.Dropout(dropout)
+        self.fc1 = nn.Linear(hidden_size, hidden_size * 2)
+        self.bn1 = nn.BatchNorm1d(hidden_size * 2)
+        self.fc2 = nn.Linear(hidden_size * 2, hidden_size)
+        self.bn2 = nn.BatchNorm1d(hidden_size)
+        self.fc3 = nn.Linear(hidden_size, hidden_size // 2)
+        self.bn3 = nn.BatchNorm1d(hidden_size // 2)
+        self.fc4 = nn.Linear(hidden_size // 2, 1)
+        self.relu = nn.ReLU()
+
+    def forward(self, packed_input, batch_size=None):
+        packed_out, _ = self.lstm(packed_input)
+        out, _ = pad_packed_sequence(packed_out, batch_first=True)
+        out = self.relu(out)
+        out = self.dropout_layer(out)
+        out = self.fc1(out)
+        out = self.bn1(out.transpose(1, 2)).transpose(1, 2)
+        out = self.relu(out)
+        out = self.fc2(out)
+        out = self.bn2(out.transpose(1, 2)).transpose(1, 2)
+        out = self.relu(out)
+        out = self.fc3(out)
+        out = self.bn3(out.transpose(1, 2)).transpose(1, 2)
+        out = self.relu(out)
+        out = self.fc4(out)
         return out
 
     # Define the weight initialization function for LSTM and other layers
