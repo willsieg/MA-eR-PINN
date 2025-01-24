@@ -25,6 +25,10 @@ class ParameterScheduler:
         elif self.schedule_type == 'cyclic':
             if 'base_lr' not in self.kwargs or 'max_lr' not in self.kwargs or 'step_size' not in self.kwargs:
                 raise ValueError("base_lr, max_lr, and step_size must be provided for cyclic schedule")
+                
+        elif self.schedule_type == 'reverse_sigmoid':
+            if 'total_epochs' not in self.kwargs:
+                raise ValueError("total_epochs must be provided for reverse_sigmoid schedule")
 
     def get_value(self, epoch):
         if self.schedule_type == 'constant':
@@ -52,12 +56,13 @@ class ParameterScheduler:
             cycle = math.floor(1 + epoch / (2 * step_size))
             x = abs(epoch / step_size - 2 * cycle + 1)
             value = base_lr + (max_lr - base_lr) * max(0, (1 - x))
+        elif self.schedule_type == 'reverse_sigmoid':
+            total_epochs = self.kwargs['total_epochs']
+            value = self.initial_value / (1 + math.exp(-10 * (epoch / total_epochs - 0.5)))
         else:
             raise ValueError(f"Unknown schedule_type: {self.schedule_type}")
 
         return value
-
-
 
 # Example usage
 if __name__ == "__main__":
@@ -95,4 +100,9 @@ if __name__ == "__main__":
     # initial value not used
     scheduler = ParameterScheduler(initial_value=0.1, schedule_type='cyclic', base_lr=0.01, max_lr=0.1, step_size=5)
     for epoch in range(20):
+        print(f"Epoch {epoch}: {scheduler.get_value(epoch)}")
+
+    # Reverse Sigmoid decay
+    scheduler = ParameterScheduler(initial_value=1.0, schedule_type='reverse_sigmoid', total_epochs=10)
+    for epoch in range(10):
         print(f"Epoch {epoch}: {scheduler.get_value(epoch)}")
