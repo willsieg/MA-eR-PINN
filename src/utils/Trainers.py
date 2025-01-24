@@ -173,6 +173,7 @@ class PTrainer_PINN():
                 lr2 = self.lr_scheduler.get_last_lr()[0]
                 self.lr_history.append(lr2)
                 if lr1 != lr2: self.print_and_log(f"Learning rate updated after epoch {epoch}: {lr1} -> {lr2}")
+
             return val_loss
 
     # TRAINING ROUTINE DEFINITION -----------------------------------------------------------------
@@ -216,6 +217,13 @@ class PTrainer_PINN():
             header_printed = False
             if not header_printed: self.only_log(f"\n{'-'*60}\n{'Epoch':<14}{'Iteration':<14}{'Batch Loss':<16}{'Train Loss':<14}\n{'-'*60}")
 
+            l_p_1 = self.l_p
+            self.l_p = self.l_p_scheduler.get_value(epoch)
+            self.l_p_history.append(self.l_p)
+            if self.l_p != l_p_1: self.print_and_log(f"Learning rate updated after epoch {epoch}: {l_p_1} -> {self.l_p}")
+
+
+
             tqdm_version = tqdm_nb if self.is_notebook else tqdm
             with tqdm_version(enumerate(self.train_loader, 1), unit="batch", total=num_iterations, leave=False) as tepoch:
                 for iter, (inputs, targets, priors, original_lengths) in tepoch:  # ----> note: (packed_inputs, padded_targets, padded_priors, lengths)
@@ -236,14 +244,13 @@ class PTrainer_PINN():
                             outputs = outputs[mask]
                             targets = targets[mask]
                             priors = priors[mask]
-                            self.l_p = self.l_p_scheduler.get_value((epoch-1)*num_iterations + iter)
-                            self.l_p_history.append(self.l_p)
+                            #self.l_p = self.l_p_scheduler.get_value((epoch-1)*num_iterations + iter)
+                            #self.l_p_history.append(self.l_p)
                             loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
                             
 
                         self.scaler.scale(loss).backward()  # Scale the loss and perform backward pass
-                        if self.clip_value is not None:
-                            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip_value)  # optional: Gradient Value Clipping
+                        if self.clip_value is not None: nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip_value)  # optional: Gradient Value Clipping
                         self.scaler.step(self.optimizer)  # Update model parameters
                         self.scaler.update()  # Update the scale for next iteration
 
@@ -258,12 +265,11 @@ class PTrainer_PINN():
                         targets = targets[mask]
                         priors = priors[mask]
                         # -------------------------------------
-                        self.l_p = self.l_p_scheduler.get_value((epoch-1)*num_iterations + iter)
-                        self.l_p_history.append(self.l_p)
+                        #self.l_p = self.l_p_scheduler.get_value((epoch-1)*num_iterations + iter)
+                        #self.l_p_history.append(self.l_p)
                         loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
                         loss.backward()
-                        if self.clip_value is not None:
-                            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip_value)  # optional: Gradient Value Clipping
+                        if self.clip_value is not None: nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip_value)  # optional: Gradient Value Clipping
                         self.optimizer.step()
 
                     # -------------------------------------------------------------
