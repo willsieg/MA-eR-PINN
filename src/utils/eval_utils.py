@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from scipy.signal import savgol_filter
 from sklearn.metrics import mean_squared_error, root_mean_squared_error, r2_score
 from tabulate import tabulate
@@ -93,20 +94,30 @@ def plot_training_performance(results):
     num_epochs = results['epoch']
     log_file = results['log_file']
 
+    best_epoch = results["best_epoch"]
+    best_val_loss = results["best_val_loss"]
+
+
     # plot training performance:
-    fig, ax1 = plt.subplots(figsize=(12,3))
-    ax1.set_xlabel('Epochs')
+    fig, ax1 = plt.subplots(figsize=(12,4))
+    ax1.set_xlabel('Epochs', fontsize=14)
+    ax1.set_ylabel('Loss', fontsize=14)
     ax1.set_xticks(range(1, num_epochs + 1))
+    ax1.xaxis.set_major_locator(ticker.MaxNLocator(integer=True, prune='both')) # Adjust tick frequency for readability
 
     ax1.plot(np.linspace(1, num_epochs, len(train_losses_per_iter)), train_losses_per_iter, label='batch_loss', color='lightblue')
-    ax1.plot(range(1, num_epochs + 1), train_losses, label='train_loss', color='blue')
-    ax1.plot(range(1, num_epochs + 1), val_losses, label='val_loss', color='red')
+    ax1.plot(range(1, num_epochs + 1), train_losses, label='train_loss', color='blue', linewidth=2)
+    ax1.plot(range(1, num_epochs + 1), val_losses, label='val_loss', color='red', linewidth=2)
+    ax1.axvline(best_epoch, color='orange', linestyle='--', label='best_epoch')
 
     ax1.set_yscale('log')
     fig.tight_layout(pad=0.8)
+    fig.patch.set_facecolor('white')
+    ax1.set_facecolor('white')
     ax1.legend()
+    ax1.grid(True)
 
-    ax1.text(0.86, 0.6, f"Train: {train_losses[-1]:.3e}\nVal:    {val_losses[-1]:.3e}", \
+    ax1.text(0.01, 0.05, f"Train_min: {min(train_losses):.3e}\nVal_min:    {best_val_loss:.3e}", \
         transform=ax1.transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
 
     # Add the log file name to the plot
@@ -114,15 +125,13 @@ def plot_training_performance(results):
 
     if pd.Series(l_p_history).nunique() > 1:
         ax2 = ax1.twinx()
-        ax2.plot(np.linspace(1, num_epochs, len(l_p_history)), l_p_history, label='l_p', color='green', linestyle='--')
-        ax2.set_ylabel('l_p', color='green')
+        ax2.plot(np.linspace(1, num_epochs, len(l_p_history)), l_p_history, label=r'$\lambda_p$', color='green', linestyle='--', linewidth=2)
+        ax2.set_ylabel(r'     $\lambda_p$', color='green', rotation=0, fontsize=18)
         ax2.tick_params(axis='y', labelcolor='green')
         #ax2.set_yscale('log')
 
-
     # Save the plot to the log file
-    plt.savefig(Path(log_file).with_suffix('.png'))
-
+    plt.savefig(Path(log_file).with_suffix('.png'), bbox_inches='tight')
     plt.show()
 
 

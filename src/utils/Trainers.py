@@ -10,7 +10,7 @@ from IPython.display import HTML, display_html
 from tabulate import tabulate
 if torch.cuda.is_available(): from torch.amp import GradScaler, autocast
 torch.set_default_dtype(torch.float32); torch.set_printoptions(precision=6, sci_mode=True)
-SEED = 42; random.seed(SEED); torch.manual_seed(SEED)
+#SEED = 42; random.seed(SEED); torch.manual_seed(SEED)
 
 
 
@@ -52,7 +52,8 @@ class PTrainer_PINN():
                  train_loader: DataLoader, num_epochs: int, device: torch.device, 
                  is_notebook: bool = False, val_loader: DataLoader = None, test_loader: DataLoader = None, 
                  lr_scheduler: torch.optim.lr_scheduler._LRScheduler = None, l_p_scheduler = None,
-                 state: dict = None, use_mixed_precision: bool = False, clip_value = None, log_file = "latest_run.txt", config = None):
+                 state: dict = None, use_mixed_precision: bool = False, use_early_stopping: bool = False, 
+                 clip_value = None, log_file = "latest_run.txt", config = None):
 
         self.model = model
         self.optimizer = optimizer
@@ -68,13 +69,21 @@ class PTrainer_PINN():
         self.l_p = None
         self.state = state
         self.use_mixed_precision = use_mixed_precision if torch.cuda.is_available() else False
+        self.use_early_stopping = use_early_stopping
         if self.use_mixed_precision: self.scaler = GradScaler('cuda')  # Initialize GradScaler
         self.clip_value = clip_value
         self.log_file = log_file if log_file is not None else None
         self.config = config
 
+        # SAVE BEST MODEL STATE -----------------------------------------------------
         # Early Stopping:
-        self.early_stopping = EarlyStopping(patience=8, verbose=True)
+        self.early_stopping = EarlyStopping(patience=10, verbose=False) if self.use_early_stopping else None
+
+        # Track the best validation loss and corresponding model state
+        self.best_val_loss = float('inf')
+        self.best_model_state = None
+        self.best_epoch = 0
+        # ---------------------------------------------------------------------------
 
         # Redirect print statements to a log file
         if self.log_file: self.log = open(self.log_file, "w")
@@ -217,12 +226,12 @@ class PTrainer_PINN():
             header_printed = False
             if not header_printed: self.only_log(f"\n{'-'*60}\n{'Epoch':<14}{'Iteration':<14}{'Batch Loss':<16}{'Train Loss':<14}\n{'-'*60}")
 
-            l_p_1 = self.l_p
-            self.l_p = self.l_p_scheduler.get_value(epoch)
-            self.l_p_history.append(self.l_p)
-            if self.l_p != l_p_1: self.print_and_log(f"Learning rate updated after epoch {epoch}: {l_p_1} -> {self.l_p}")
-
-
+            if self.l_p is not None:
+                l_p_1 = self.l_p
+                self.l_p = self.l_p_scheduler.get_value(epoch)
+                self.l_p_history.append(self.l_p)
+                #if self.l_p != l_p_1: self.print_and_log(f"l_p updated after epoch {epoch}: {l_p_1:.3f} -> {self.l_p:.3f}")
+            else: self.l_p = self.l_p_scheduler.get_value(epoch)
 
             tqdm_version = tqdm_nb if self.is_notebook else tqdm
             with tqdm_version(enumerate(self.train_loader, 1), unit="batch", total=num_iterations, leave=False) as tepoch:
@@ -319,13 +328,26 @@ class PTrainer_PINN():
                 else:
                     print_row(self.training_table)
 
-            self.early_stopping(val_loss)
-            if self.early_stopping.early_stop:
-                print(f"Early stopping.\n{'-'*60}\n")
-                break
+
+                # Check if this is the best validation loss so far
+                if val_loss < self.best_val_loss:
+                    self.best_val_loss = val_loss
+                    self.best_model_state = {
+                        "model_state_dict": self.model.state_dict(),
+                        "optimizer_state_dict": self.optimizer.state_dict(),
+                    }
+                    self.best_epoch = epoch
+
+
+            if self.early_stopping:
+                self.early_stopping(val_loss)
+                if self.early_stopping.early_stop:
+                    print(f"Early stopping.\n{'-'*60}\n")
+                    break
 
         elapsed_time = round(time.perf_counter() - start_time)
-        self.print_and_log(f"{'-'*60}\nTraining Completed.\tExecution Time: {time.strftime('%H:%M:%S', time.gmtime(elapsed_time))}\n{'-'*60}\n")
+        self.print_and_log(f"{'-'*60}\nTraining Completed.\tExecution Time: {time.strftime('%H:%M:%S', time.gmtime(elapsed_time))}\
+            \nBest Val Loss: {self.best_val_loss:.6f} after {self.best_epoch} epochs\n{'-'*60}\n")
 
         if self.config is not None:
                 config_df = pd.DataFrame(list(self.config.items()), columns=['Parameter', 'Value'])
@@ -337,8 +359,11 @@ class PTrainer_PINN():
 
         return {
             # model and optimizer states
-            "model_state_dict": self.model.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
+            "model_state_dict": self.best_model_state["model_state_dict"] if self.best_model_state else self.model.state_dict(),
+            "optimizer_state_dict": self.best_model_state["optimizer_state_dict"] if self.best_model_state else self.optimizer.state_dict(),
+            
+            "best_epoch": self.best_epoch,  # completed epochs when best val_loss is obtained
+            "best_val_loss": self.best_val_loss,
 
             # training performance
             "training_table": self.training_table,
@@ -350,9 +375,9 @@ class PTrainer_PINN():
             
             # settings and meta data
             "loss_fn": self.loss_fn_pinn,
-            "epoch": epoch,
+            "epoch": epoch,                     # all executed epochs
             "elapsed_train_time": elapsed_time,
-            "log_file": self.log_file
+            "log_file": self.log_file  
         }
 
 

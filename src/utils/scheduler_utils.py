@@ -56,9 +56,11 @@ class ParameterScheduler:
             cycle = math.floor(1 + epoch / (2 * step_size))
             x = abs(epoch / step_size - 2 * cycle + 1)
             value = base_lr + (max_lr - base_lr) * max(0, (1 - x))
+
         elif self.schedule_type == 'reverse_sigmoid':
             total_epochs = self.kwargs['total_epochs']
-            value = self.initial_value / (1 + math.exp(-10 * (epoch / total_epochs - 0.5)))
+            value = self.initial_value / (1 + math.exp(10 * (epoch / total_epochs - 0.5)))
+            
         else:
             raise ValueError(f"Unknown schedule_type: {self.schedule_type}")
 
