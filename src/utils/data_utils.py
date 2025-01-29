@@ -164,6 +164,99 @@ class TripDataset_PINN(Dataset):
         )
 
 
+class TripDataset_PINN_reversed(Dataset):
+    def __init__(self, file_list: list, input_columns: list, target_column: str, prior_column: str, scaler, target_scaler, prior_scaler, fit: bool = False):
+        self.file_list = file_list
+
+        self.input_columns = input_columns
+        self.target_column = target_column
+        self.prior_column = prior_column
+
+        self.scaler = scaler
+        self.target_scaler = target_scaler
+        self.prior_scaler = prior_scaler
+        self.fit = fit
+        self.data = []
+        self.targets = []
+        self.priors = []
+        self.cumulative_lengths = []
+
+        # fitting scalers over complete training dataset
+        if self.fit:
+            print(f"fitting Scalers: {scaler.__class__.__name__}, {target_scaler.__class__.__name__}, {prior_scaler.__class__.__name__}")
+            # Initialize and Fit the scalers on the complete training data set
+            # Fit the scalers incrementally to avoid memory errors
+            num_files = len(self.file_list)
+            for i, file in enumerate(self.file_list):
+                df = pd.read_parquet(file, columns = input_columns+target_column+prior_column, engine='pyarrow')
+                X = df[input_columns].values
+                y = df[target_column].values.reshape(-1, 1)  # Reshape to match the shape of the input: 2D array with one column
+                p = df[prior_column].values.reshape(-1, 1)
+                self.scaler.partial_fit(X)
+                self.target_scaler.partial_fit(y)
+
+                # IMPORTANT: Scale the prior scaler on target values, so it is identical to the target scaler --> y/n ? --> no
+                self.prior_scaler.partial_fit(p)   
+            
+                # Print status info at 50%
+                if i == num_files // 2: print(f"\t50% of the fitting done...")
+                
+            print(f"Done. Create DataSets and DataLoaders...")
+
+        # Check if the scalers are fitted on all samples
+        if not (self.scaler.n_samples_seen_ == self.target_scaler.n_samples_seen_ == self.prior_scaler.n_samples_seen_):
+            raise ValueError("Scalers are not equally fitted. Please ensure all scalers are fitted with the same number of samples before transforming the data.")
+
+        # transform with fitted scalers
+        cumulative_length = 0
+        for i, file in enumerate(self.file_list):
+            # DATA PREPROCESSING -----------------------------------------------------------
+            # Assigning inputs and targets and reshaping ---------------
+            df = pd.read_parquet(file, columns = input_columns+target_column+prior_column, engine='pyarrow')
+            X = df[input_columns].values
+            y = df[target_column].values
+            p = df[prior_column].values
+
+            # FOR REVERSED ONLY !!
+            X_reversed = X[::-1]
+            y_reversed = y[::-1].reshape(-1, 1)
+            p_reversed = p[::-1].reshape(-1, 1)
+            # use the previously fitted scalers to transform the data
+
+            X = self.scaler.transform(X_reversed)  
+            y = self.target_scaler.transform(y_reversed).squeeze()  # is .squeeze() necessary here?
+            p = self.prior_scaler.transform(p_reversed).squeeze()
+
+            # Append to data
+            self.data.append(torch.tensor(X, dtype=torch.float32))
+            self.targets.append(torch.tensor(y, dtype=torch.float32))
+            self.priors.append(torch.tensor(p, dtype=torch.float32))
+            cumulative_length += len(y)
+            self.cumulative_lengths.append(cumulative_length)
+
+        self.length = cumulative_length
+
+    def __len__(self): return self.length
+
+    def __getitem__(self, index) -> tuple:
+        # Check if the index is within the valid range
+        if index < 0 or index >= self.length:
+            raise IndexError("Index out of range")
+        
+        # Use binary search to find the correct file and index
+        file_idx = bisect.bisect_right(self.cumulative_lengths, index)
+        if file_idx > 0:
+            index -= self.cumulative_lengths[file_idx - 1]
+        return (
+            self.data[file_idx][index].unsqueeze(0),  # Add time dimension
+            self.targets[file_idx][index],
+            self.priors[file_idx][index]
+        )
+
+
+
+
+
 ###################################################################################################################################
 # -----------------------------------------------------------------------------------------------------------
 # DATASET DEFINITION (BATCH LEVEL) -----------------------------------------------------------------------
@@ -455,7 +548,7 @@ def prepare_dataloader(subset, indices_by_length, batch_size, input_columns, tar
 
 
 def prepare_dataloader_PINN(subset, indices_by_length, batch_size, input_columns, target_column, prior_column, scaler, \
-    target_scaler, prior_scaler, dataloader_settings, fit=False, drop_last = False) -> tuple:
+    target_scaler, prior_scaler, dataloader_settings, fit=False, drop_last = False, reversed = False) -> tuple:
     """
     Prepares a DataLoader for the given dataset subset.
 
@@ -504,7 +597,10 @@ def prepare_dataloader_PINN(subset, indices_by_length, batch_size, input_columns
         subset.indices = subset.indices[:-(remainder)]
         print(f" --> Warning: Removed the last {remainder} samples to ensure a balanced batch size")
 
-    dataset = TripDataset_PINN(subset, input_columns, target_column, prior_column, scaler, target_scaler, prior_scaler, fit=fit)
+    if reversed:
+        dataset = TripDataset_PINN_reversed(subset, input_columns, target_column, prior_column, scaler, target_scaler, prior_scaler, fit=fit)
+    else:
+        dataset = TripDataset_PINN(subset, input_columns, target_column, prior_column, scaler, target_scaler, prior_scaler, fit=fit)
     
     
     dataset_batches = create_batches_PINN(dataset, batch_size)

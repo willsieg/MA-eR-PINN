@@ -66,8 +66,8 @@ class PTrainer_PINN():
         self.test_loader = test_loader
         self.lr_scheduler = lr_scheduler
         self.l_p_scheduler = l_p_scheduler
-        self.l_p = None
         self.state = state
+        self.l_p = None
         self.use_mixed_precision = use_mixed_precision if torch.cuda.is_available() else False
         self.use_early_stopping = use_early_stopping
         if self.use_mixed_precision: self.scaler = GradScaler('cuda')  # Initialize GradScaler
@@ -102,6 +102,11 @@ class PTrainer_PINN():
             self.model.eval()  # Set model to evaluation mode
             test_loss = 0.0
             all_outputs, all_targets, all_priors, all_original_lengths = [], [], [], []
+
+            if self.l_p is None: 
+                self.l_p_history = self.state['l_p_history']
+                self.best_epoch = self.state['best_epoch']
+                self.l_p = self.l_p_history[self.best_epoch-1]
 
             with torch.no_grad():
                 for inputs, targets, priors, original_lengths in self.test_loader:

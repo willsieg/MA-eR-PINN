@@ -98,6 +98,7 @@ def plot_training_performance(results):
     best_val_loss = results["best_val_loss"]
 
 
+
     # plot training performance:
     fig, ax1 = plt.subplots(figsize=(12,4))
     ax1.set_xlabel('Epochs', fontsize=14)
@@ -134,6 +135,68 @@ def plot_training_performance(results):
     plt.savefig(Path(log_file).with_suffix('.png'), bbox_inches='tight')
     plt.show()
 
+def plot_training_performance_comp(results):
+
+    # get required data from results dict
+    train_losses_per_iter = results['train_losses_per_iter']
+    train_losses, val_losses = results['train_losses'], results['val_losses']
+    lr_history = results['lr_history']
+    l_p_history = results['l_p_history']
+    num_epochs = results['epoch']
+    log_file = results['log_file']
+
+    best_epoch = results["best_epoch"]
+    best_val_loss = results["best_val_loss"]
+
+    train_losses_components = results["train_losses_components"]
+    val_losses_components = results["val_losses_components"]
+
+    train_losses_mse = [a[0] for a in train_losses_components]
+    train_losses_phys = [a[1] for a in train_losses_components]
+    val_losses_mse = [a[0][0] for a in val_losses_components]
+    val_losses_phys = [a[0][1] for a in val_losses_components]
+
+
+    # plot training performance:
+    fig, ax1 = plt.subplots(figsize=(12,4))
+    ax1.set_xlabel('Epochs', fontsize=14)
+    ax1.set_ylabel('Loss', fontsize=14)
+    ax1.set_xticks(range(1, num_epochs + 1))
+    ax1.xaxis.set_major_locator(ticker.MaxNLocator(integer=True, prune='both')) # Adjust tick frequency for readability
+
+    ax1.plot(np.linspace(1, num_epochs, len(train_losses_per_iter)), train_losses_per_iter, label='batch_loss', color='lightblue')
+    ax1.plot(range(1, num_epochs + 1), train_losses, label='train_loss', color='blue', linewidth=2)
+    ax1.plot(range(1, num_epochs + 1), val_losses, label='val_loss', color='red', linewidth=2)
+
+    ax1.plot(range(1, num_epochs + 1), val_losses_mse, label='L_mse', color='black', linewidth=1, linestyle='--')
+    ax1.plot(range(1, num_epochs + 1), val_losses_phys, label='L_phys', color='blue', linewidth=1, linestyle='--')
+
+
+    ax1.axvline(best_epoch, color='orange', linestyle='--', label='best_epoch')
+
+    ax1.set_yscale('log')
+    fig.tight_layout(pad=0.8)
+    fig.patch.set_facecolor('white')
+    ax1.set_facecolor('white')
+    ax1.legend()
+    ax1.grid(True)
+
+    ax1.text(0.01, 0.05, f"Train_min: {min(train_losses):.3e}\nVal_min:    {best_val_loss:.3e}", \
+        transform=ax1.transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
+
+    # Add the log file name to the plot
+    fig.text(0.01, 0.01, f" {os.path.basename(log_file).strip('_log.txt')}", fontsize=8, color='gray', alpha=0.7)
+
+    if pd.Series(l_p_history).nunique() > 1:
+        ax2 = ax1.twinx()
+        ax2.plot(np.linspace(1, num_epochs, len(l_p_history)), l_p_history, label=r'$\lambda_p$', color='green', linestyle='--', linewidth=2)
+        ax2.set_ylabel(r'     $\lambda_p$', color='green', rotation=0, fontsize=18)
+        ax2.tick_params(axis='y', labelcolor='green')
+        #ax2.set_yscale('log')
+
+    # Save the plot to the log file
+    plt.savefig(Path(log_file).with_suffix('.png'), bbox_inches='tight')
+    plt.show()
 
 # PLOT PREDICTION -----------------------------------------------------------------
 def plot_prediction(y_true, y_pred, plot_active=True):

@@ -59,13 +59,14 @@ class ParameterScheduler:
 
         elif self.schedule_type == 'reverse_sigmoid':
             total_epochs = self.kwargs['total_epochs']
-            value = self.initial_value / (1 + math.exp(10 * (epoch / total_epochs - 0.5)))
+            value = self.initial_value / (1 + math.exp(10 * (epoch / total_epochs - 0.1)))
             
         else:
             raise ValueError(f"Unknown schedule_type: {self.schedule_type}")
 
         return value
 
+'''
 # Example usage
 if __name__ == "__main__":
     # Constant value
@@ -108,3 +109,20 @@ if __name__ == "__main__":
     scheduler = ParameterScheduler(initial_value=1.0, schedule_type='reverse_sigmoid', total_epochs=10)
     for epoch in range(10):
         print(f"Epoch {epoch}: {scheduler.get_value(epoch)}")
+
+'''
+
+'''
+scheduler = ParameterScheduler(initial_value=0.6, schedule_type='exponential', decay_rate=0.96)
+for epoch in range(1500):
+    if epoch % 100 == 0:
+        print(f"Epoch {epoch}: {scheduler.get_value(epoch)}")
+'''
+
+'''
+scheduler = ParameterScheduler(initial_value=1.0, schedule_type='reverse_sigmoid', total_epochs=1500)
+for epoch in range(1501):
+    if epoch % 100 == 0:
+        print(f"Epoch {epoch}: {scheduler.get_value(epoch)}")
+
+'''
