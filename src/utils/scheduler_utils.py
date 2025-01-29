@@ -45,7 +45,7 @@ class ParameterScheduler:
             value = self.initial_value * math.pow(decay_rate, epoch)
         elif self.schedule_type == 'linear':
             absolute_reduction = self.kwargs['absolute_reduction']
-            value = self.initial_value - absolute_reduction * epoch
+            value = max(0, self.initial_value - absolute_reduction * epoch)
         elif self.schedule_type == 'cosine_annealing':
             total_epochs = self.kwargs['total_epochs']
             value = self.initial_value * (1 + math.cos(math.pi * epoch / total_epochs)) / 2
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         print(f"Epoch {epoch}: {scheduler.get_value(epoch)}")
 
     # Linear decay with absolute reduction
-    scheduler = ParameterScheduler(initial_value=0.1, schedule_type='linear', absolute_reduction=0.01)
+    scheduler = ParameterScheduler(initial_value=0.1, schedule_type='linear', absolute_reduction=0.03)
     for epoch in range(5):
         print(f"Epoch {epoch}: {scheduler.get_value(epoch)}")
 

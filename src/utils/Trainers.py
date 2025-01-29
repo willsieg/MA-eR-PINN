@@ -115,7 +115,7 @@ class PTrainer_PINN():
                             outputs_masked = outputs[mask]
                             targets_masked = targets[mask]
                             priors_masked = priors[mask]
-                            loss = self.loss_fn_pinn(outputs_masked.squeeze(), targets_masked, priors_masked, self.l_p)
+                            loss, loss_componentss = self.loss_fn_pinn(outputs_masked.squeeze(), targets_masked, priors_masked, self.l_p)
                             test_loss += loss.item()
                     else:
                         outputs = self.model(inputs)  # inputs are packed, outputs are not ! --> see forward method in model
@@ -124,7 +124,7 @@ class PTrainer_PINN():
                         outputs_masked = outputs[mask]
                         targets_masked = targets[mask]
                         priors_masked = priors[mask]
-                        loss = self.loss_fn_pinn(outputs_masked.squeeze(), targets_masked, priors_masked, self.l_p)
+                        loss, loss_components = self.loss_fn_pinn(outputs_masked.squeeze(), targets_masked, priors_masked, self.l_p)
                         test_loss += loss.item()
                     # -------------------------------------
                     # Detach tensors from the computation graph and move them to CPU
@@ -150,6 +150,8 @@ class PTrainer_PINN():
         else:
             self.model.eval()  # Set model to evaluation mode
             val_loss = 0.0
+            loss_components_list = []
+            val_losses_components = []
             with torch.no_grad():  # Disable gradient calculation
                 for inputs, targets, priors, original_lengths in self.val_loader:
                     inputs, targets, priors = inputs.to(self.device), targets.to(self.device), priors.to(self.device)
@@ -163,7 +165,9 @@ class PTrainer_PINN():
                             outputs = outputs[mask]
                             targets = targets[mask]
                             priors = priors[mask]
-                            loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
+                            loss, loss_components = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
+                            loss_components = tuple(tensor.detach().cpu().numpy() for tensor in loss_components)
+                            loss_components_list.append(loss_components)
                             val_loss += loss.item()
                     else:
                         outputs = self.model(inputs)  # inputs are packed, outputs are not ! --> see forward method in model
@@ -172,7 +176,9 @@ class PTrainer_PINN():
                         outputs = outputs[mask]
                         targets = targets[mask]
                         priors = priors[mask]
-                        loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
+                        loss, loss_components = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
+                        loss_components = tuple(tensor.detach().cpu().numpy() for tensor in loss_components)
+                        loss_components_list.append(loss_components)
                         val_loss += loss.item()
             # -------------------------------------          
             val_loss /= len(self.val_loader)  # Calculate average validation loss
@@ -182,8 +188,10 @@ class PTrainer_PINN():
                 lr2 = self.lr_scheduler.get_last_lr()[0]
                 self.lr_history.append(lr2)
                 if lr1 != lr2: self.print_and_log(f"Learning rate updated after epoch {epoch}: {lr1} -> {lr2}")
+            
+            val_losses_components.append(tuple(sum(values)/len(self.train_loader) for values in zip(*loss_components_list)))
 
-            return val_loss
+            return val_loss, val_losses_components
 
     # TRAINING ROUTINE DEFINITION -----------------------------------------------------------------
     def train_model(self) -> dict:
@@ -211,6 +219,8 @@ class PTrainer_PINN():
             self.train_losses = [] 
             self.train_losses_per_iter = []
             self.val_losses = []  
+            self.train_losses_components = []
+            self.val_losses_components = []
             self.training_table = []  
             self.lr_history = []
             self.l_p_history = []
@@ -222,6 +232,7 @@ class PTrainer_PINN():
         for epoch in range(start_epoch, self.num_epochs + 1):
             self.model.train()  # set model to training mode
             running_loss = 0.0
+            loss_components_list = []
             num_iterations = math.ceil(len(self.train_loader.dataset) / self.train_loader.batch_size)
             header_printed = False
             if not header_printed: self.only_log(f"\n{'-'*60}\n{'Epoch':<14}{'Iteration':<14}{'Batch Loss':<16}{'Train Loss':<14}\n{'-'*60}")
@@ -255,7 +266,9 @@ class PTrainer_PINN():
                             priors = priors[mask]
                             #self.l_p = self.l_p_scheduler.get_value((epoch-1)*num_iterations + iter)
                             #self.l_p_history.append(self.l_p)
-                            loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
+                            loss, loss_components = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
+                            loss_components = tuple(tensor.detach().cpu().numpy() for tensor in loss_components)
+
                             
 
                         self.scaler.scale(loss).backward()  # Scale the loss and perform backward pass
@@ -276,7 +289,8 @@ class PTrainer_PINN():
                         # -------------------------------------
                         #self.l_p = self.l_p_scheduler.get_value((epoch-1)*num_iterations + iter)
                         #self.l_p_history.append(self.l_p)
-                        loss = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
+                        loss, loss_components = self.loss_fn_pinn(outputs.squeeze(), targets, priors, self.l_p)
+                        loss_components = tuple(tensor.detach().cpu().numpy() for tensor in loss_components)
                         loss.backward()
                         if self.clip_value is not None: nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip_value)  # optional: Gradient Value Clipping
                         self.optimizer.step()
@@ -301,12 +315,14 @@ class PTrainer_PINN():
                     # -------------------------------------------------------------
                     # Update running loss and progress bar
                     self.train_losses_per_iter.append(loss.item())
+                    loss_components_list.append(loss_components)
                     running_loss += loss.item()  # accumulate loss for epoch
                     tepoch.set_postfix(loss=loss.item()); tepoch.update(1)
 
             # Calculate average training loss for the epoch
             avg_train_loss = running_loss / len(self.train_loader)
             self.train_losses.append(avg_train_loss)
+            self.train_losses_components.append(tuple(sum(values)/len(self.train_loader) for values in zip(*loss_components_list)))
 
             # Update the performance table
             add_row(self.training_table, f" ", f"{iter}", f"{loss.item():.6f}", f"{avg_train_loss:.6f}")
@@ -318,8 +334,9 @@ class PTrainer_PINN():
 
             # VALIDATION
             if self.val_loader:
-                val_loss = self.validate_model(epoch)
+                val_loss, val_loss_components = self.validate_model(epoch)
                 self.val_losses.append(val_loss)
+                self.val_losses_components.append(val_loss_components)
                 # Update the performance table
                 add_row(self.training_table, f"Val", f"Validation Loss:", f"{val_loss:.6f}", "")
                 self.only_log(f"\n{'Val':<14}{'Validation Loss:':<14}\t\t\t\t{val_loss:.6f}")
@@ -372,6 +389,9 @@ class PTrainer_PINN():
             "val_losses": self.val_losses,
             'lr_history': self.lr_history,
             'l_p_history': self.l_p_history,
+
+            "train_losses_components": self.train_losses_components,
+            "val_losses_components": self.val_losses_components,
             
             # settings and meta data
             "loss_fn": self.loss_fn_pinn,

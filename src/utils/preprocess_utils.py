@@ -22,9 +22,9 @@ def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root) -> t
     # FILTER INPUT FILES --------------------------------------------------------
     # generate lengths of all files by reading metadata or using presaved lengths
     try:
-        presaved_lengths = pd.read_pickle(Path(root, 'data', 'df_files_lengths_2.pickle'))
-        presaved_lengths = presaved_lengths.set_index('FileName').to_dict()['Length']
-        trip_lengths = [presaved_lengths[file.name] for file in files]
+        presaved_lengths = pd.read_pickle(Path(root, 'data', 'df_files_lengths_3.pickle'))
+        presaved_lengths_2 = presaved_lengths.set_index('FileName').to_dict()['Length']
+        trip_lengths = [presaved_lengths_2[file.name] for file in files]
     except:
         print(f"{'-'*60}\nObtaining sequence lengths... ")
         trip_lengths = [pq.read_metadata(file).num_rows for file in files]
@@ -52,7 +52,7 @@ def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root) -> t
     sorted_trip_lengths = file_length_df['Length'].to_list()
     print(file_length_df)
     
-    return files, trip_lengths, indices_by_length, sorted_trip_lengths, all_signals
+    return files, trip_lengths, indices_by_length, sorted_trip_lengths, all_signals, presaved_lengths
 
 
 def print_dataset_sizes(train_dataset, val_dataset, test_dataset, train_subset, val_subset, test_subset, files) -> dict:

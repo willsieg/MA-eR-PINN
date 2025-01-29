@@ -20,7 +20,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.nn.parameter import Parameter
 from torch.nn.utils.rnn import pack_sequence, pad_sequence, pack_padded_sequence, pad_packed_sequence
-from torch.utils.data import DataLoader, TensorDataset, Dataset, random_split
+from torch.utils.data import DataLoader, TensorDataset, Dataset, random_split, Subset
 torch.set_default_dtype(torch.float32); torch.set_printoptions(precision=6, sci_mode=True)
 
 #import torch.multiprocessing as mp
