@@ -59,7 +59,10 @@ class ParameterScheduler:
 
         elif self.schedule_type == 'reverse_sigmoid':
             total_epochs = self.kwargs['total_epochs']
-            value = self.initial_value / (1 + math.exp(10 * (epoch / total_epochs - 0.1)))
+            if epoch >= total_epochs+100:
+                value = 0.0
+            else:
+                value = self.initial_value / (1 + math.exp(10 * (epoch / total_epochs - 0.5)))
             
         else:
             raise ValueError(f"Unknown schedule_type: {self.schedule_type}")
@@ -120,8 +123,8 @@ for epoch in range(1500):
 '''
 
 '''
-scheduler = ParameterScheduler(initial_value=1.0, schedule_type='reverse_sigmoid', total_epochs=1500)
-for epoch in range(1501):
+scheduler = ParameterScheduler(initial_value=1.0, schedule_type='reverse_sigmoid', total_epochs=2800)
+for epoch in range(3001):
     if epoch % 100 == 0:
         print(f"Epoch {epoch}: {scheduler.get_value(epoch)}")
 

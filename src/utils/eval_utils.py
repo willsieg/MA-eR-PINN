@@ -168,11 +168,11 @@ def plot_training_performance_comp(results):
     ax1.plot(range(1, num_epochs + 1), train_losses, label='train_loss', color='blue', linewidth=2)
     ax1.plot(range(1, num_epochs + 1), val_losses, label='val_loss', color='red', linewidth=2)
 
-    ax1.plot(range(1, num_epochs + 1), val_losses_mse, label='L_mse', color='black', linewidth=1, linestyle='--')
-    ax1.plot(range(1, num_epochs + 1), val_losses_phys, label='L_phys', color='blue', linewidth=1, linestyle='--')
+    ax1.plot(range(1, num_epochs + 1), val_losses_mse, label='L_mse', color='orange', linewidth=1)
+    ax1.plot(range(1, num_epochs + 1), val_losses_phys, label='L_phys', color='green', linewidth=1)
 
 
-    ax1.axvline(best_epoch, color='orange', linestyle='--', label='best_epoch')
+    ax1.axvline(best_epoch, color='black', linestyle='--', label='best_epoch')
 
     ax1.set_yscale('log')
     fig.tight_layout(pad=0.8)

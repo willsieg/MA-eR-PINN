@@ -69,7 +69,7 @@ CONFIG = {
     "LRSCHEDULER":      "torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)",  # constant LR for 1.0 as multiplicative factor
 
     # LOSS FUNCTION: ---------------------------------------------------------------
-    "LPSCHEDULER":      "ParameterScheduler(initial_value=1.0, schedule_type='reverse_sigmoid', total_epochs=NUM_EPOCHS, decay_rate=0.99, absolute_reduction=0.001)",
+    "LPSCHEDULER":      "ParameterScheduler(initial_value=1.0, schedule_type='reverse_sigmoid', total_epochs=2800)",
     #       'constant': [], 'time_based': ['decay_rate'], 'step_based': ['drop_rate', 'epochs_drop'], 'exponential': ['decay_rate'], 'linear': ['absolute_reduction'], 
     #       'cosine_annealing': ['total_epochs'], 'cyclic': ['base_lr', 'max_lr', 'step_size'], 'reverse_sigmoid': ['total_epochs']
 

@@ -29,7 +29,7 @@ from pathlib import Path
 CONFIG = {
     # SYSTEM: ---------------------------------------------------------------------
     "GPU_SELECT":       0,
-    "ROOT":             Path('../../..').resolve(),
+    "ROOT":             Path('../..').resolve(),
     "INPUT_LOCATION":   Path("TripSequences", "trips_processed_pinn_4"), 
     "OUTPUT_LOCATION":  Path("src", "models", "pth"),
     "SEED"  :           14,
@@ -59,8 +59,8 @@ CONFIG = {
     "DROPOUT":          0.05,  # usually: [0.2 - 0.5]
     
     # TRAINING & OPTIMIZER: --------------------------------------------------------
-    "NUM_EPOCHS":       500,         # max epochs
-    "BATCH_SIZE":       256,         # [2, 4, 8, 16, 32, 64, 128, 256]
+    "NUM_EPOCHS":       2000,         # max epochs
+    "BATCH_SIZE":       128,         # [2, 4, 8, 16, 32, 64, 128, 256]
     "LEARNING_RATE":    0.0003,     # 0.001 lr
     "OPTIMIZER":        'adam',     # ('adam', 'sgd', 'adamw')
     "WEIGHT_DECAY":     1e-7,       # weight decay coefficient (default: 1e-2)
@@ -151,16 +151,21 @@ file_length_df
 
 # OR: 
 
-# TRAIN IN GERMANY, TEST/VAL IN SPAIN
-train_indices = file_length_df.index[(file_length_df['Lat'] > 45) & (file_length_df['Lat'] < 60)].tolist()
-val_test_indices = file_length_df.index[(file_length_df['Lat'] < 45) ].tolist()
-random.shuffle(val_test_indices)
+# TRAIN/TEST IN GERMANY, VAL IN SPAIN/SWEDEN
+train_test_indices = file_length_df.index[(file_length_df['Lat'] > 45) & (file_length_df['Lat'] < 60)].tolist()
+val_indices = file_length_df.index[(file_length_df['Lat'] <= 45) | (file_length_df['Lat'] >= 60)].tolist()
 
-train_subset = Subset(files, train_indices)
+random.shuffle(train_test_indices)
+random.shuffle(val_indices)
 
-val_subset = Subset(files, val_test_indices[:len(val_test_indices)//2])
-test_subset = Subset(files, val_test_indices[len(val_test_indices)//2:])
+val_subset = Subset(files, val_indices)                     # All of ESP/SWE Trips for Val
+cutoff = int(len(train_test_indices) * 0.85)
+train_subset = Subset(files, train_test_indices[:cutoff])   # 85% of GER Trips for Train
+test_subset = Subset(files, train_test_indices[cutoff:])    # 15% of GER Trips for Test
 
+#print(len(train_subset)/len(file_length_df))                # 67% of all
+#print(len(val_subset)/len(file_length_df))                  # 21% of all
+#print(len(test_subset)/len(file_length_df))                 # 12% of all
 
 
 # +
