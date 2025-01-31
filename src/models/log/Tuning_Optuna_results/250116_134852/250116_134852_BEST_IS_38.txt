@@ -1,0 +1,13 @@
+{
+    "params": {
+        "HIDDEN_SIZE": 60,
+        "NUM_LAYERS": 3,
+        "DROPOUT": 0.0,
+        "CLIP_GRAD": 1.0,
+        "WEIGHT_INIT_TYPE": "default",
+        "OPTIMIZER": "adamw",
+        "LEARNING_RATE": 0.0005,
+        "WEIGHT_DECAY": 0.0001
+    },
+    "value": 4.368109703063965
+}

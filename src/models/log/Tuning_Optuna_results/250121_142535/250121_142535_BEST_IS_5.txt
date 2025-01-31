@@ -1,0 +1,9 @@
+{
+    "params": {
+        "HIDDEN_SIZE": 220,
+        "NUM_LAYERS": 4,
+        "DROPOUT": 0.03,
+        "LEARNING_RATE": 0.0005
+    },
+    "value": 1.5882378816604614
+}

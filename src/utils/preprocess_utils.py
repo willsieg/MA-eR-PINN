@@ -5,7 +5,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 
 
-def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root) -> tuple:
+def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root, presaved=True) -> tuple:
     
     # PREPARE TRAIN & TEST SET ---------------------------------------------------
     all_files = [Path(input_folder, f) for f in os.listdir(input_folder) if f.endswith(".parquet")]
@@ -21,11 +21,11 @@ def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root) -> t
 
     # FILTER INPUT FILES --------------------------------------------------------
     # generate lengths of all files by reading metadata or using presaved lengths
-    try:
-        presaved_lengths = pd.read_pickle(Path(root, 'data', 'df_files_lengths_3.pickle'))
+    if presaved:
+        presaved_lengths = pd.read_pickle(Path(root, 'data', 'Datasets', 'df_files_lengths_3.pickle'))
         presaved_lengths_2 = presaved_lengths.set_index('FileName').to_dict()['Length']
         trip_lengths = [presaved_lengths_2[file.name] for file in files]
-    except:
+    else:
         print(f"{'-'*60}\nObtaining sequence lengths... ")
         trip_lengths = [pq.read_metadata(file).num_rows for file in files]
 
@@ -52,7 +52,7 @@ def prepare_data(input_folder, pth_folder, max_files, min_seq_length, root) -> t
     sorted_trip_lengths = file_length_df['Length'].to_list()
     print(file_length_df)
     
-    return files, trip_lengths, indices_by_length, sorted_trip_lengths, all_signals, presaved_lengths
+    return files, trip_lengths, indices_by_length, sorted_trip_lengths, all_signals, presaved_lengths if presaved else file_length_df 
 
 
 def print_dataset_sizes(train_dataset, val_dataset, test_dataset, train_subset, val_subset, test_subset, files) -> dict:
