@@ -60,7 +60,7 @@ CONFIG = {
     
     # TRAINING & OPTIMIZER: --------------------------------------------------------
     "NUM_EPOCHS":       2000,         # max epochs
-    "BATCH_SIZE":       128,         # [2, 4, 8, 16, 32, 64, 128, 256]
+    "BATCH_SIZE":       200,         # [2, 4, 8, 16, 32, 64, 128, 256]
     "LEARNING_RATE":    0.0003,     # 0.001 lr
     "OPTIMIZER":        'adam',     # ('adam', 'sgd', 'adamw')
     "WEIGHT_DECAY":     1e-7,       # weight decay coefficient (default: 1e-2)
@@ -80,7 +80,7 @@ CONFIG = {
 global LOSS_FN
 from torch import nn
 
-class CustomLoss(nn.Module):
+class CustomLoss(nn.Module):        # (1-l)*L_MSE + l*L_phys
     def __init__(self):
         super(CustomLoss, self).__init__()
         self.mse_loss = nn.MSELoss()
@@ -89,7 +89,9 @@ class CustomLoss(nn.Module):
         mse_loss_value = self.mse_loss(y_pred, y_true)                      # loss w.r.t. data
         phys_loss_value = self.mse_loss(y_pred, y_phys)                     # loss w.r.t. physical model
         total_loss = (1 - l_p) * mse_loss_value + l_p * phys_loss_value     # total loss, weighted by l_p-factor
-        return total_loss
+
+        loss_components = (mse_loss_value, phys_loss_value)
+        return total_loss, loss_components
 
 class CustomLoss_2(nn.Module):
     def __init__(self):
